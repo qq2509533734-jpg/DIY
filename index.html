@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, touch-action: manipulation" />
 <title>水晶手串DIY工具</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
@@ -23,16 +23,17 @@ cursor: grabbing;
 position:absolute;
 top:2px;
 right:2px;
-width:20px;
-height:20px;
+width:24px;
+height:24px;
 background:#ef4444;
 color:#fff;
 border-radius:50%;
-font-size:13px;
+font-size:14px;
 display:flex;
 align-items:center;
 justify-content:center;
-z-index:10;
+z-index:20;
+pointer-events:auto !important;
 }
 canvas{
 display:block;
@@ -68,23 +69,32 @@ color:#fff;
 .material-card{
 font-size:11px;
 }
+/* 折叠面板通用样式 */
 .collapse-header{
 cursor:pointer;
 user-select:none;
 display:flex;
 justify-content:space-between;
 align-items:center;
-min-height:44px;
+min-height:48px;
 }
 .collapse-body{
 overflow:hidden;
 transition:max-height 0.25s ease;
 }
+/* 加大移动端按钮点击区域，强制可点击 */
 button{
-min-height:44px;
+min-height:48px;
+pointer-events:auto !important;
+cursor:pointer;
 }
 input[type=range]{
-min-height:36px;
+min-height:40px;
+}
+.del-tab-btn{
+pointer-events:auto !important;
+z-index:15;
+cursor:pointer;
 }
 </style>
 </head>
@@ -99,6 +109,7 @@ min-height:36px;
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-[2.4fr_1fr] gap-3 md:gap-4">
+    <!-- ========= PC左侧：画布主栏 ========= -->
     <div class="bg-white rounded-xl shadow p-3 order-1 flex flex-col items-center">
       <div class="w-full mb-3 flex flex-wrap gap-2 items-center justify-between text-sm">
         <span>画布设置</span>
@@ -115,6 +126,7 @@ min-height:36px;
         <canvas id="canvas" width="640" height="640"></canvas>
       </div>
 
+      <!-- 素材库分组 -->
       <div class="w-full mt-3 border rounded-lg overflow-hidden">
         <div class="collapse-header bg-gray-50 p-2 font-semibold text-sm" onclick="toggleMaterialPanel()">
           <span>素材库分组</span>
@@ -128,19 +140,6 @@ min-height:36px;
             <div id="groupTabWrap" class="flex flex-wrap gap-1 mb-2 max-h-[80px] overflow-y-auto"></div>
 
             <input id="materialSearch" placeholder="🔍搜索素材名称" class="w-full border rounded px-2 py-2 text-sm mb-2" oninput="renderMaterial()">
-
-            <!-- 标签筛选区域 -->
-            <div class="grid grid-cols-3 gap-2 mb-2">
-              <select id="filterColorTag" class="border rounded px-2 py-2 text-sm w-full" onchange="renderMaterial()">
-                <option value="">全部颜色</option>
-              </select>
-              <select id="filterSizeTag" class="border rounded px-2 py-2 text-sm w-full" onchange="renderMaterial()">
-                <option value="">全部尺寸</option>
-              </select>
-              <select id="filterWuxingTag" class="border rounded px-2 py-2 text-sm w-full" onchange="renderMaterial()">
-                <option value="">全部五行</option>
-              </select>
-            </div>
 
             <div class="flex gap-2 mb-2 flex-wrap">
               <label class="bg-blue-500 text-white px-2 py-2 rounded-lg cursor-pointer text-sm flex-1 text-center">
@@ -174,6 +173,7 @@ min-height:36px;
         </div>
       </div>
 
+      <!-- 价格 & 五行统计 -->
       <div class="w-full mt-3 border rounded-lg overflow-hidden">
         <div class="collapse-header bg-gray-50 p-2 font-semibold text-sm" onclick="togglePriceChartPanel()">
           <span>价格 & 五行统计</span>
@@ -200,7 +200,9 @@ min-height:36px;
       <p class="text-xs text-gray-400 mt-2">拖动珠子调换顺序；选中珠子可镜像、调角度尺寸</p>
     </div>
 
+    <!-- PC右侧参数栏 -->
     <div class="bg-white rounded-xl shadow p-3 order-2 flex flex-col gap-3">
+      <!-- 选中珠子单独调节 -->
       <div class="border rounded-lg overflow-hidden">
         <div class="collapse-header p-2 font-bold" onclick="toggleSelectBeadPanel()">
           <h3 class="text-base">选中珠子单独调节</h3>
@@ -232,6 +234,7 @@ min-height:36px;
         </div>
       </div>
 
+      <!-- 全局参数 -->
       <div class="border rounded-lg overflow-hidden">
         <div class="collapse-header p-2 font-bold" onclick="toggleGlobalPanel()">
           <h3 class="text-base">全局参数</h3>
@@ -297,6 +300,7 @@ min-height:36px;
         </div>
       </div>
 
+      <!-- 手串方案管理 -->
       <div class="border rounded-lg overflow-hidden">
         <div class="collapse-header p-2 font-bold" onclick="toggleSchemePanel()">
           <h3 class="text-base">手串方案管理</h3>
@@ -323,6 +327,7 @@ min-height:36px;
   </div>
 </div>
 
+<!-- 弹窗 -->
 <div id="editMaterialPanel" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-3">
   <div class="bg-white rounded-xl p-4 w-full max-w-[340px]">
     <h4 class="font-bold mb-3">编辑素材信息</h4>
@@ -381,6 +386,7 @@ min-height:36px;
 </div>
 
 <script>
+// =========全部折叠面板状态变量=========
 let globalPanelExpand = false;
 let materialPanelExpand = false;
 let selectBeadPanelExpand = true;
@@ -448,19 +454,23 @@ function toggleSchemePanel(){
   }
 }
 
+// ==========【画布初始化｜移动端触屏重大修复】==========
 const canvas = new fabric.Canvas('canvas', {
   preserveObjectStacking: true,
   touchSupport: true,
   allowTouchScrolling:true,
+  stopTouchPropagation: false, //关键修复：不阻断页面其他元素触摸事件
   selection: true,
-  targetFindTolerance: 36,
-  perPixelTargetFind: false,
-  stopTouchPropagation: false
+  targetFindTolerance: 38, //加大触屏点击容错
+  perPixelTargetFind: false
 });
+//修复 fabric5.x touchcancel 锁死触摸bug（苹果Safari核心问题）
 canvas.on('touchcancel',()=>{ canvas._mainTouchId = null; });
+//兜底手动拾取珠子：原生选择失败时自己遍历
 canvas.on('mouse:down', function(opt){
   if(opt.target) return;
   const pointer = canvas.getPointer(opt.e);
+  //倒序，选最上层珠子
   const found = [...beadList].reverse().find(bead=> bead.containsPoint(pointer));
   if(found){
     canvas.setActiveObject(found);
@@ -551,6 +561,7 @@ window.addEventListener('resize',()=>{
 });
 document.getElementById('autoCanvasMode').onchange = resizeCanvas;
 
+// 撤销重做
 let historyStack = [];
 let historyIndex = -1;
 const HISTORY_MAX = 60;
@@ -610,6 +621,7 @@ function loadSnapshot(snap){
   });
 }
 
+// 背景色
 let bgColor = localStorage.getItem('bgColor') || "#ffffff";
 canvas.setBackgroundColor(bgColor, canvas.renderAll.bind(canvas));
 document.getElementById('bgColorPicker').value = bgColor;
@@ -666,18 +678,21 @@ function renderGroupTabs(){
   groupData.groups.forEach((g,idx)=>{
     const div = document.createElement('div');
     div.className = "flex items-center gap-1 px-2 py-2 rounded text-sm cursor-pointer " + (g===currentGroup ? "tab-active" : "bg-gray-200");
+    div.dataset.groupName = g;
     div.innerHTML = `<span>${g}</span><button data-group-idx="${idx}" class="del-tab-btn text-red-500 text-xs ml-1">×</button>`;
     div.onclick = (e)=>{
       if(e.target.classList.contains('del-tab-btn')) return;
-      currentGroup = g;
+      currentGroup = div.dataset.groupName;
       renderGroupTabs();
       renderMaterial();
     };
     wrap.appendChild(div);
   });
+  //删除分组｜事件委托修复，按钮优先触发
   document.querySelectorAll('.del-tab-btn').forEach(btn=>{
     btn.onclick=(ev)=>{
       ev.stopPropagation();
+      ev.preventDefault();
       const idx=Number(btn.dataset.groupIdx);
       delGroup(idx);
     }
@@ -702,53 +717,8 @@ function delGroup(idx){
   saveGroupStorage();renderGroupTabs();renderMaterial();
 }
 
-// 更新筛选下拉选项
-function refreshFilterOptions(){
-  const matList = groupData.materials[currentGroup] || [];
-  const colorSet = new Set();
-  const sizeSet = new Set();
-  const wuxingSet = new Set();
-
-  matList.forEach(mat=>{
-    if(mat.color) colorSet.add(mat.color.trim());
-    if(mat.sizeTag) sizeSet.add(mat.sizeTag.trim());
-    if(mat.wuxing) wuxingSet.add(mat.wuxing.trim());
-  });
-
-  const colorSel = document.getElementById('filterColorTag');
-  const sizeSel = document.getElementById('filterSizeTag');
-  const wuxSel = document.getElementById('filterWuxingTag');
-
-  const colorVal = colorSel.value;
-  const sizeVal = sizeSel.value;
-  const wuxVal = wuxSel.value;
-
-  colorSel.innerHTML = `<option value="">全部颜色</option>`;
-  [...colorSet].sort().forEach(c=>{
-    colorSel.innerHTML += `<option value="${c}">${c}</option>`;
-  });
-  colorSel.value = colorVal;
-
-  sizeSel.innerHTML = `<option value="">全部尺寸</option>`;
-  [...sizeSet].sort((a,b)=>Number(a)-Number(b)).forEach(s=>{
-    sizeSel.innerHTML += `<option value="${s}">${s}</option>`;
-  });
-  sizeSel.value = sizeVal;
-
-  wuxSel.innerHTML = `<option value="">全部五行</option>`;
-  [...wuxingSet].forEach(w=>{
-    wuxSel.innerHTML += `<option value="${w}">${w}</option>`;
-  });
-  wuxSel.value = wuxVal;
-}
-
 function renderMaterial() {
-  refreshFilterOptions();
   const keyword = document.getElementById("materialSearch").value.trim().toLowerCase();
-  const filterColor = document.getElementById("filterColorTag").value;
-  const filterSize = document.getElementById("filterSizeTag").value;
-  const filterWuxing = document.getElementById("filterWuxingTag").value;
-
   const wrap = document.getElementById('materialList');
   wrap.innerHTML = '';
   const list = groupData.materials[currentGroup] || [];
@@ -757,14 +727,7 @@ function renderMaterial() {
       matObj = {src:matObj, name:"素材"+(idx+1), price:0, wuxing:"",color:"",sizeTag:""};
       list[idx] = matObj; saveGroupStorage();
     }
-
-    // 搜索过滤
     if(keyword && !matObj.name.toLowerCase().includes(keyword)) return;
-    // 标签多重过滤
-    if(filterColor && matObj.color !== filterColor) return;
-    if(filterSize && matObj.sizeTag !== filterSize) return;
-    if(filterWuxing && matObj.wuxing !== filterWuxing) return;
-
     const div = document.createElement('div');
     div.className = "bead-item border rounded p-1 bg-gray-50 material-card";
     const wxClass = matObj.wuxing ? `wuxing-tag tag-${matObj.wuxing}` : '';
@@ -782,12 +745,13 @@ function renderMaterial() {
         ${matObj.wuxing ? `<span class="${wxClass}">${matObj.wuxing}</span>`:''}
       </div>
     `;
+    //修复：把长按计时器放到子元素判断，删除按钮优先捕获事件
+    let pressTimer;
     div.onclick = (e)=>{
       if(e.target.classList.contains('del-mat-btn')) return;
       addBead(matObj);
     };
-    let pressTimer;
-    div.onmousedown = div.ontouchstart = (e)=>{
+    div.ontouchstart = (e)=>{
       if(e.target.classList.contains('del-mat-btn')) return;
       pressTimer = setTimeout(()=>{
         editMaterialIndex = idx;
@@ -795,12 +759,25 @@ function renderMaterial() {
         openEditMaterialPanel(matObj);
       },600);
     };
-    div.onmouseup = div.onmouseleave = div.ontouchend = ()=>clearTimeout(pressTimer);
+    div.ontouchend = div.ontouchcancel = ()=>{
+      clearTimeout(pressTimer);
+    };
+    div.onmousedown = (e)=>{
+      if(e.target.classList.contains('del-mat-btn')) return;
+      pressTimer = setTimeout(()=>{
+        editMaterialIndex = idx;
+        editMaterialGroup = currentGroup;
+        openEditMaterialPanel(matObj);
+      },600);
+    };
+    div.onmouseup = div.onmouseleave = ()=>clearTimeout(pressTimer);
     wrap.appendChild(div);
   });
+  //素材删除按钮，强制阻止冒泡，优先执行
   document.querySelectorAll('.del-mat-btn').forEach(btn=>{
     btn.onclick=(ev)=>{
       ev.stopPropagation();
+      ev.preventDefault();
       const idx=Number(btn.dataset.matIdx);
       if(!confirm("确定删除这条素材？"))return;
       groupData.materials[currentGroup].splice(idx,1);
@@ -919,6 +896,21 @@ document.getElementById('importMaterialFile').onchange = function(e){
   };fr.readAsText(e.target.files[0]);
 };
 
+function exportSchemePack(){
+  const blob = new Blob([JSON.stringify(schemeList)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = "手串方案包.json";a.click();URL.revokeObjectURL(a.href);
+}
+document.getElementById('importSchemeFile').onchange = function(e){
+  const fr=new FileReader();fr.onload=res=>{
+    try{
+      const arr=JSON.parse(res.target.result);
+      if(confirm("合并导入方案？")){schemeList=[...schemeList,...arr];localStorage.setItem('crystalSchemeList',JSON.stringify(schemeList));renderSchemeList();alert("导入成功");}
+    }catch{alert("文件错误");}
+  };fr.readAsText(e.target.files[0]);
+};
+
 function addBead(matObj) {
   saveHistory();
   const size = parseFloat(document.getElementById('beadSize').value);
@@ -1022,14 +1014,227 @@ function updateSingleSizeUI(){
   const inp = document.getElementById("singleBeadSizeInput");
   const rotSlider = document.getElementById("beadRotateSlider");
   const rotInp = document.getElementById("beadRotateInput");
-  if(!selectedBead){
+  const tipDom = document.getElementById("selectTip");
+
+  const activeObj = canvas.getActiveObject();
+  if(!activeObj || !beadList.includes(activeObj)){
+    selectedBead = null;
     slider.disabled = true;
-    inp.disabled = true;
-    rotSlider.disabled = true;
-    rotInp.disabled = true;
-    document.getElementById("selectTip").style.display = "block";
+    inp.disabled=true;
+    rotSlider.disabled=true;
+    rotInp.disabled=true;
+    tipDom.innerText = "请先点击画布上的珠子选中";
     return;
   }
+
+  selectedBead = activeObj;
   slider.disabled = false;
-  inp.disabled = false;
- 
+  inp.disabled=false;
+  rotSlider.disabled=false;
+  rotInp.disabled=false;
+
+  const w = selectedBead.getScaledWidth();
+  slider.value = w;
+  inp.value = w.toFixed(1);
+  rotSlider.value = selectedBead.angle;
+  rotInp.value = selectedBead.angle.toFixed(1);
+  tipDom.innerText = "✅已选中珠子｜支持镜像、旋转、单独调尺寸";
+}
+
+canvas.on('selection:created', (opt) => {
+  selectedBead = opt.target;
+  updateSingleSizeUI();
+});
+canvas.on('selection:updated', (opt) => {
+  selectedBead = opt.target;
+  updateSingleSizeUI();
+});
+canvas.on('selection:cleared', () => {
+  selectedBead = null;
+  updateSingleSizeUI();
+});
+
+//参数双向绑定
+//全局尺寸
+document.getElementById('beadSize').oninput=function(){
+  const v=parseFloat(this.value);
+  document.getElementById('beadSizeInput').value=v.toFixed(1);
+};
+document.getElementById('beadSizeInput').onchange=function(){
+  let v=parseFloat(this.value);
+  v=Math.max(20,Math.min(66,v));
+  document.getElementById('beadSize').value=v;
+  this.value=v.toFixed(1);
+};
+document.getElementById('ringRadius').oninput=function(){
+  const v=parseFloat(this.value);
+  document.getElementById('ringRadiusInput').value=v.toFixed(1);
+  updateBeadPosition();
+};
+document.getElementById('ringRadiusInput').onchange=function(){
+  let v=parseFloat(this.value);
+  v=Math.max(140,Math.min(260,v));
+  document.getElementById('ringRadius').value=v;
+  this.value=v.toFixed(1);
+  updateBeadPosition();
+};
+document.getElementById('gapAngle').oninput=function(){
+  const v=parseFloat(this.value);
+  document.getElementById('gapAngleInput').value=v.toFixed(1);
+  updateBeadPosition();
+};
+document.getElementById('gapAngleInput').onchange=function(){
+  let v=parseFloat(this.value);
+  v=Math.max(0,Math.min(120,v));
+  document.getElementById('gapAngle').value=v;
+  this.value=v.toFixed(1);
+  updateBeadPosition();
+};
+document.getElementById('beadOpacity').oninput=function(){
+  const v=parseFloat(this.value);
+  document.getElementById('beadOpacityInput').value=v.toFixed(1);
+};
+document.getElementById('beadOpacityInput').onchange=function(){
+  let v=parseFloat(this.value);
+  v=Math.max(30,Math.min(100,v));
+  document.getElementById('beadOpacity').value=v;
+  this.value=v.toFixed(1);
+};
+document.getElementById('shadowLevel').oninput=function(){
+  const v=parseFloat(this.value);
+  document.getElementById('shadowLevelInput').value=v.toFixed(1);
+};
+document.getElementById('shadowLevelInput').onchange=function(){
+  let v=parseFloat(this.value);
+  v=Math.max(0,Math.min(15,v));
+  document.getElementById('shadowLevel').value=v;
+  this.value=v.toFixed(1);
+};
+//单颗珠子
+document.getElementById('singleBeadSize').oninput=function(){
+  if(!selectedBead)return;
+  const w=parseFloat(this.value);
+  document.getElementById('singleBeadSizeInput').value=w.toFixed(1);
+  saveHistory();
+  selectedBead.scaleToWidth(w);
+  selectedBead.setCoords();
+  canvas.renderAll();
+  updateBeadPosition();
+};
+document.getElementById('singleBeadSizeInput').onchange=function(){
+  if(!selectedBead)return;
+  let w=parseFloat(this.value);
+  w=Math.max(20,Math.min(80,w));
+  document.getElementById('singleBeadSize').value=w;
+  this.value=w.toFixed(1);
+  saveHistory();
+  selectedBead.scaleToWidth(w);
+  selectedBead.setCoords();
+  canvas.renderAll();
+  updateBeadPosition();
+};
+document.getElementById('beadRotateSlider').oninput=function(){
+  if(!selectedBead)return;
+  const deg=parseFloat(this.value);
+  document.getElementById('beadRotateInput').value=deg.toFixed(1);
+  saveHistory();
+  selectedBead.set({angle:deg});
+  selectedBead.setCoords();
+  canvas.renderAll();
+};
+document.getElementById('beadRotateInput').onchange=function(){
+  if(!selectedBead)return;
+  let deg=parseFloat(this.value);
+  deg=Math.max(0,Math.min(360,deg));
+  document.getElementById('beadRotateSlider').value=deg;
+  this.value=deg.toFixed(1);
+  saveHistory();
+  selectedBead.set({angle:deg});
+  selectedBead.setCoords();
+  canvas.renderAll();
+};
+
+function clearAllBeads(){
+  if(beadList.length===0)return;
+  if(!confirm("清空全部珠子？"))return;
+  saveHistory();
+  beadList.forEach(b=>canvas.remove(b));
+  beadList=[];
+  selectedBead=null;
+  canvas.discardActiveObject();
+  canvas.renderAll();
+  updateSingleSizeUI();
+  updatePriceAndWuxingStat();
+}
+function removeSelectedBead(){
+  if(!selectedBead){alert("先选中一颗珠子");return;}
+  saveHistory();
+  const idx=beadList.indexOf(selectedBead);
+  canvas.remove(selectedBead);
+  beadList.splice(idx,1);
+  selectedBead=null;
+  canvas.discardActiveObject();
+  canvas.renderAll();
+  updateBeadPosition();
+  updateSingleSizeUI();
+  updatePriceAndWuxingStat();
+}
+
+function saveScheme(){
+  const snap=beadList.map(item=>{
+    return {
+      src:item._element.src,
+      scale:item.scaleX,
+      opacity:item.opacity,
+      angle:item.angle,
+      flipX:item.flipX,
+      materialData:item.materialData
+    };
+  });
+  schemeList.push(snap);
+  localStorage.setItem('crystalSchemeList',JSON.stringify(schemeList));
+  renderSchemeList();
+  alert("方案已保存");
+}
+function loadScheme(idx){
+  saveHistory();
+  loadSnapshot(schemeList[idx]);
+}
+function delScheme(idx){
+  if(!confirm("删除这条方案？"))return;
+  schemeList.splice(idx,1);
+  localStorage.setItem('crystalSchemeList',JSON.stringify(schemeList));
+  renderSchemeList();
+}
+function clearSchemeList(){
+  if(!confirm("清空所有本地保存方案？"))return;
+  schemeList=[];
+  localStorage.setItem('crystalSchemeList',JSON.stringify(schemeList));
+  renderSchemeList();
+}
+
+function exportImg(){
+  const url=canvas.toDataURL({format:'png',quality:0.92});
+  const a=document.createElement('a');
+  a.href=url;
+  a.download="手串预览.png";
+  a.click();
+}
+
+//初始化
+window.onload=function(){
+  initChart();
+  renderGroupTabs();
+  renderMaterial();
+  renderSchemeList();
+  resizeCanvas();
+  //全局参数滑块初始同步输入框
+  document.getElementById('beadSizeInput').value=parseFloat(document.getElementById('beadSize').value).toFixed(1);
+  document.getElementById('ringRadiusInput').value=parseFloat(document.getElementById('ringRadius').value).toFixed(1);
+  document.getElementById('gapAngleInput').value=parseFloat(document.getElementById('gapAngle').value).toFixed(1);
+  document.getElementById('beadOpacityInput').value=parseFloat(document.getElementById('beadOpacity').value).toFixed(1);
+  document.getElementById('shadowLevelInput').value=parseFloat(document.getElementById('shadowLevel').value).toFixed(1);
+}
+</script>
+</body>
+</html>
