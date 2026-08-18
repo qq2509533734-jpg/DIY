@@ -129,7 +129,7 @@ min-height:36px;
 
             <input id="materialSearch" placeholder="🔍搜索素材名称" class="w-full border rounded px-2 py-2 text-sm mb-2" oninput="renderMaterial()">
 
-            <!-- 新增：标签筛选区域 -->
+            <!-- 标签筛选区域 -->
             <div class="grid grid-cols-3 gap-2 mb-2">
               <select id="filterColorTag" class="border rounded px-2 py-2 text-sm w-full" onchange="renderMaterial()">
                 <option value="">全部颜色</option>
@@ -702,7 +702,7 @@ function delGroup(idx){
   saveGroupStorage();renderGroupTabs();renderMaterial();
 }
 
-// ========== 新增：更新筛选下拉选项 ==========
+// 更新筛选下拉选项
 function refreshFilterOptions(){
   const matList = groupData.materials[currentGroup] || [];
   const colorSet = new Set();
@@ -758,7 +758,7 @@ function renderMaterial() {
       list[idx] = matObj; saveGroupStorage();
     }
 
-    // 名称搜索过滤
+    // 搜索过滤
     if(keyword && !matObj.name.toLowerCase().includes(keyword)) return;
     // 标签多重过滤
     if(filterColor && matObj.color !== filterColor) return;
@@ -1021,4 +1021,15 @@ function updateSingleSizeUI(){
   const slider = document.getElementById("singleBeadSize");
   const inp = document.getElementById("singleBeadSizeInput");
   const rotSlider = document.getElementById("beadRotateSlider");
-  const rotInp = document.getElementById("
+  const rotInp = document.getElementById("beadRotateInput");
+  if(!selectedBead){
+    slider.disabled = true;
+    inp.disabled = true;
+    rotSlider.disabled = true;
+    rotInp.disabled = true;
+    document.getElementById("selectTip").style.display = "block";
+    return;
+  }
+  slider.disabled = false;
+  inp.disabled = false;
+ 
