@@ -37,6 +37,25 @@
     padding: 14px;
   }
 
+  /* 新增：画布设置栏样式 */
+  .canvas-settings {
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    background: #f7fbfd;
+    border-radius: 8px;
+    border: 1px solid #e3edf3;
+  }
+  .canvas-settings .ctrl-row {
+    margin-bottom: 0;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .canvas-settings label {
+    width: auto;
+    color: #667;
+    font-size: 12px;
+  }
+
   .canvas-wrap {
     display: flex;
     justify-content: center;
@@ -44,13 +63,16 @@
     background: linear-gradient(135deg, #eaf4fb, #f8f9fa);
     border-radius: 10px;
     padding: 10px;
+    overflow: auto;
   }
   canvas#cv {
-    background: #ffffff;
+    background: transparent;
     border-radius: 8px;
     box-shadow: inset 0 0 0 1px #dfe9f0;
     cursor: grab;
     touch-action: none;
+    max-width: 100%;
+    height: auto;
   }
   canvas#cv.dragging { cursor: grabbing; }
 
@@ -89,7 +111,6 @@
   .ctrl-row label { width: 70px; color: #667; }
   .ctrl-row input[type=range] { flex: 1; }
   
-  /* 新增：精确输入框样式 */
   .ctrl-input {
     width: 60px;
     padding: 2px 4px;
@@ -290,12 +311,25 @@
 
 <div class="app-header">
   <h1>🔮 水晶手串 DIY 工具</h1>
-  <p>独立尺寸调整 · 间隙严格锁定2px · 动态周长计算 · 拖拽排序/删除</p>
+  <p>独立尺寸调整 · 间隙严格锁定2px · 动态周长计算 · 拖拽排序/删除 · 自定义画布</p>
 </div>
 
 <div class="main-wrap">
   <div class="left-col">
     <div class="card">
+      <!-- 新增：画布设置区域 -->
+      <div class="canvas-settings">
+        <div class="ctrl-row">
+          <label>画布宽:</label>
+          <input type="number" id="cvWidth" class="ctrl-input" value="600" min="300" max="1200" step="10">
+          <label>画布高:</label>
+          <input type="number" id="cvHeight" class="ctrl-input" value="600" min="300" max="1200" step="10">
+          <label>背景色:</label>
+          <input type="color" id="cvBgColor" value="#ffffff" style="width:36px; height:28px; padding:2px; border:1px solid #d5e3ec; border-radius:4px; cursor:pointer; vertical-align: middle;">
+          <button class="btn btn-primary" onclick="applyCanvasSettings()" style="padding: 4px 12px; font-size: 11px;">应用设置</button>
+        </div>
+      </div>
+      
       <div class="canvas-wrap">
         <canvas id="cv" width="600" height="600"></canvas>
       </div>
@@ -411,13 +445,18 @@ const newPlanId = () => 'p' + (planIdCounter++);
 /* ========= Canvas 初始化 ========= */
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
-const W = cv.width, H = cv.height;
-const CX = W/2, CY = H/2;
+
+// 将画布相关尺寸变量改为 let 以支持动态修改
+let W = cv.width, H = cv.height;
+let CX = W/2, CY = H/2;
 
 const DEL_ZONE_W = 120;
 const DEL_ZONE_H = 120;
-const DEL_ZONE_X = W - DEL_ZONE_W - 20;
-const DEL_ZONE_Y = H - DEL_ZONE_H - 20;
+let DEL_ZONE_X = W - DEL_ZONE_W - 20;
+let DEL_ZONE_Y = H - DEL_ZONE_H - 20;
+
+// 新增：画布背景色变量
+let canvasBgColor = '#ffffff';
 
 /* ========= 颜色工具 ========= */
 function hexToRgb(h){h=h.replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');return[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
@@ -433,6 +472,35 @@ function getColorName(hex) {
     '#6fb8d9': '海蓝', '#f2b5c3': '粉晶', '#7cc48a': '绿幽灵', '#e8c766': '黄水晶', '#b59ad6': '紫水晶'
   };
   return map[hex.toLowerCase()] || '';
+}
+
+/* ========= 新增：应用画布设置 ========= */
+function applyCanvasSettings() {
+  const newW = parseInt(document.getElementById('cvWidth').value) || 600;
+  const newH = parseInt(document.getElementById('cvHeight').value) || 600;
+  const newBg = document.getElementById('cvBgColor').value;
+  
+  // 限制合理范围
+  W = Math.max(300, Math.min(1200, newW));
+  H = Math.max(300, Math.min(1200, newH));
+  
+  // 更新 Canvas 实际尺寸
+  cv.width = W;
+  cv.height = H;
+  
+  // 回写输入框以防输入了越界值
+  document.getElementById('cvWidth').value = W;
+  document.getElementById('cvHeight').value = H;
+  
+  // 重新计算中心点和删除区坐标
+  CX = W / 2;
+  CY = H / 2;
+  DEL_ZONE_X = W - DEL_ZONE_W - 20;
+  DEL_ZONE_Y = H - DEL_ZONE_H - 20;
+  
+  canvasBgColor = newBg;
+  
+  render();
 }
 
 /* ========= 搜索匹配逻辑 ========= */
@@ -484,7 +552,7 @@ function computeLayout() {
   let R = totalCircumference / (2 * Math.PI);
   
   // 自适应渲染缩放，确保手串完整显示在画布内
-  const maxR = 260; 
+  const maxR = Math.min(W, H) / 2 - 40; 
   let viewScale = 1;
   if (R > maxR) {
     viewScale = maxR / R;
@@ -513,9 +581,11 @@ function computeLayout() {
 /* ========= 渲染 ========= */
 function render() {
   ctx.clearRect(0, 0, W, H);
-  const bg = ctx.createRadialGradient(CX, CY, 50, CX, CY, 400);
-  bg.addColorStop(0, '#ffffff');
-  bg.addColorStop(1, '#f1f7fb');
+  
+  // 绘制自定义背景色（带轻微径向渐变提升质感）
+  const bg = ctx.createRadialGradient(CX, CY, 50, CX, CY, Math.max(W, H) * 0.6);
+  bg.addColorStop(0, lighten(canvasBgColor, 8));
+  bg.addColorStop(1, canvasBgColor);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
@@ -801,10 +871,8 @@ function updateAdjustPanel() {
     
     html += `<div style="font-size:11px; color:#2c5f7c; margin-bottom:8px; font-weight:600;">已选中 ${count} 颗珠子</div>`;
     
-    // 实时物理尺寸显示
     html += `<div class="ctrl-row"><label>当前直径</label><span class="val" id="curSizeVal" style="width:auto; flex:1; text-align:left; font-size:13px; color:#d96b6b;">${currentSize.toFixed(1)} mm</span></div>`;
     
-    // 尺寸缩放滑块 + 输入框
     html += `
       <div class="ctrl-row">
         <label>尺寸缩放</label>
@@ -812,7 +880,6 @@ function updateAdjustPanel() {
         <input type="number" class="ctrl-input" id="iScale" min="1.0" max="3.0" step="0.05" value="${initScale.toFixed(2)}">
       </div>`;
     
-    // 旋转角度滑块 + 输入框
     html += `
       <div class="ctrl-row">
         <label>旋转角度</label>
@@ -829,7 +896,6 @@ function updateAdjustPanel() {
     const scaleInput = document.getElementById('iScale');
     const rotInput = document.getElementById('iRot');
     
-    // 同步更新函数
     const syncScale = (val) => {
       val = Math.max(1.0, Math.min(3.0, parseFloat(val)));
       if (isNaN(val)) val = 1.0;
@@ -841,7 +907,6 @@ function updateAdjustPanel() {
         if(beads[i]) beads[i].scale = val;
       });
       
-      // 更新当前直径显示
       let newSize = 0;
       if (lastSelectedIdx >= 0 && beads[lastSelectedIdx]) {
         const m = materials.find(x => x.id === beads[lastSelectedIdx].materialId);
@@ -866,7 +931,6 @@ function updateAdjustPanel() {
       render();
     };
     
-    // 绑定事件
     scaleSlider.oninput = e => syncScale(e.target.value);
     scaleInput.onchange = e => syncScale(e.target.value);
     
