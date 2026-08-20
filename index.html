@@ -2,8 +2,9 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>水晶手串DIY工具_标签重构版</title>
+<title>水晶手串DIY工具_手绘路径增强版_支持缩放</title>
 <style>
+  /* 保持原有样式不变 */
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -63,26 +64,29 @@
   }
 
   .canvas-wrap {
+    position: relative;
     display: flex;
     justify-content: center;
     align-items: center;
     background: linear-gradient(135deg, #eaf4fb, #f8f9fa);
     border-radius: 10px;
     padding: 10px;
-    overflow: auto;
+    overflow: hidden; /* 修改为 hidden，防止滚动条出现，由内部平移代替 */
+    height: 650px; /* 固定高度以便观察 */
   }
   canvas#cv {
     background: transparent;
     border-radius: 8px;
     box-shadow: inset 0 0 0 1px #dfe9f0;
-    cursor: grab;
+    cursor: crosshair;
     touch-action: none;
-    max-width: 100%;
-    height: auto;
+    /* 移除 max-width/height 限制，让 canvas 保持原始分辨率，通过 CSS transform 或内部逻辑缩放 */
+    /* 这里我们保持 canvas 尺寸不变，通过 JS 逻辑缩放内容 */
   }
   canvas#cv.dragging { cursor: grabbing; }
+  canvas#cv.drawing { cursor: crosshair; }
+  canvas#cv.panning { cursor: grab; }
 
-  /* 选中珠子简洁文字展示区 */
   .selected-bead-text {
     margin-top: 8px;
     padding: 8px;
@@ -169,6 +173,7 @@
   .btn-warn { background: #e6a157; }
   .btn-danger { background: #d96b6b; }
   .btn-ghost { background: #eef3f7; color: #2c5f7c; border: 1px solid #d5e3ec; }
+  .btn-active { background: #2c5f7c; color: #fff; }
   .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
 
   .no-select-tip {
@@ -368,25 +373,23 @@
   }
   .mat-meta { font-size: 9px; color: #889; margin-top: 2px; }
   
-  /* 新增：右上角库存角标样式 */
   .mat-stock-badge {
     position: absolute;
     top: 6px;
     right: 6px;
-    background-color: #5cb88a; /* 绿色背景 */
-    color: #fff;               /* 白色文字 */
+    background-color: #5cb88a;
+    color: #fff;
     font-size: 10px;
     font-weight: bold;
     padding: 2px 6px;
-    border-radius: 10px;       /* 圆角矩形 */
-    z-index: 2;                /* 确保在最上层 */
+    border-radius: 10px;
+    z-index: 2;
     box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-    pointer-events: none;      /* 让鼠标点击穿透，不影响点击卡片 */
+    pointer-events: none;
   }
 
-  /* 如果库存为0，可以换个颜色（可选） */
   .mat-item.out-of-stock .mat-stock-badge {
-    background-color: #d96b6b; /* 红色背景 */
+    background-color: #d96b6b;
   }
 
   .mat-wx {
@@ -443,6 +446,31 @@
   .plan-actions { display: flex; gap: 4px; }
   .plan-actions .btn { padding: 3px 8px; font-size: 10px; }
 
+  .path-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 10px;
+  }
+  .path-item {
+    background: #f7fbfd;
+    border: 1px solid #e3edf3;
+    border-radius: 6px;
+    padding: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .path-item.active {
+    border-color: #2c5f7c;
+    background: #eaf4fb;
+  }
+  .path-info { flex: 1; }
+
   .modal-mask {
     position: fixed; inset: 0; background: rgba(30,50,70,.45);
     display: none; justify-content: center; align-items: center; z-index: 100;
@@ -458,17 +486,42 @@
   .modal-box .field input, .modal-box .field select {
     width: 100%; padding: 5px 8px; border: 1px solid #d5e3ec; border-radius: 5px; font-size: 12px;
   }
-  .modal-box .field .field-hint {
-    font-size: 10px; color: #99a; margin-top: 2px;
-  }
   .modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+  
+  /* 新增：缩放控制按钮样式 */
+  .zoom-controls {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    background: rgba(255,255,255,0.9);
+    padding: 5px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  .zoom-btn {
+    width: 30px;
+    height: 30px;
+    border: 1px solid #d5e3ec;
+    background: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #2c5f7c;
+  }
+  .zoom-btn:hover { background: #f1f7fb; }
 </style>
 </head>
 <body>
 
 <div class="app-header">
-  <h1>🔮 水晶手串 DIY 工具</h1>
-  <p>独立尺寸调整 · 动态周长计算 · 拖拽排序/删除 · 自定义画布 · 自定义标签筛选</p>
+  <h1>🔮 黑凤梨手串工具V2.0 (支持缩放/平移)</h1>
+  <p>提示：滚轮缩放，按住空格+拖拽 或 中键拖拽可移动画布</p>
 </div>
 
 <div class="main-wrap">
@@ -477,26 +530,31 @@
       <div class="canvas-settings">
         <div class="ctrl-row">
           <label>画布宽:</label>
-          <input type="number" id="cvWidth" class="ctrl-input" value="600" min="300" max="1200" step="10">
+          <input type="number" id="cvWidth" class="ctrl-input" value="800" min="300" max="1200" step="10">
           <label>画布高:</label>
-          <input type="number" id="cvHeight" class="ctrl-input" value="600" min="300" max="1200" step="10">
+          <input type="number" id="cvHeight" class="ctrl-input" value="800" min="300" max="1200" step="10">
           <label>背景色:</label>
           <input type="color" id="cvBgColor" value="#ffffff" style="width:36px; height:28px; padding:2px; border:1px solid #d5e3ec; border-radius:4px; cursor:pointer; vertical-align: middle;">
           <button class="btn btn-primary" onclick="applyCanvasSettings()" style="padding: 4px 12px; font-size: 11px;">应用</button>
           
           <div class="action-bar">
-            <button class="btn btn-danger" onclick="clearBracelet()">🗑 清空</button>
+            <button class="btn btn-warn" id="drawModeBtn" onclick="toggleDrawMode()">✏️ 开启手绘</button>
+            <button class="btn btn-danger" onclick="clearBracelet()">🗑 清空圆环</button>
             <button class="btn btn-ok" onclick="exportImage()">🖼 导出</button>
-            <button class="btn btn-warn" onclick="resetCanvas()">🔄 重置</button>
+            <button class="btn btn-ghost" onclick="resetCanvas()">🔄 重置视图</button>
           </div>
         </div>
       </div>
       
       <div class="canvas-wrap">
-        <canvas id="cv" width="600" height="600"></canvas>
+        <canvas id="cv" width="800" height="800"></canvas>
+        <div class="zoom-controls">
+          <button class="zoom-btn" onclick="zoomIn()">+</button>
+          <button class="zoom-btn" onclick="zoomOut()">-</button>
+          <button class="zoom-btn" onclick="resetView()" title="重置视图">⟲</button>
+        </div>
       </div>
       
-      <!-- 选中珠子简洁文字展示区 -->
       <div class="selected-bead-text empty" id="selectedBeadText">
         点击画布上的珠子查看所选信息
       </div>
@@ -549,6 +607,21 @@
 
     <div class="card plan-section">
       <div class="plan-header">
+        <h3>🛤️ 路径管理</h3>
+      </div>
+      <div class="path-list" id="pathList">
+        <div style="text-align:center;color:#99a;font-size:11px;padding:12px">暂无手绘路径</div>
+      </div>
+      
+      <div id="pathEditControls" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid #eee;">
+        <div class="ctrl-row" style="justify-content:flex-end; margin-top:8px;">
+          <button class="btn btn-danger" onclick="deleteSelectedPath()" style="font-size:10px; padding:4px 8px;">删除此路径</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card plan-section">
+      <div class="plan-header">
         <h3>📋 方案库</h3>
         <div class="mat-actions">
           <button class="btn btn-ghost" onclick="document.getElementById('importPlanLib').click()">导入</button>
@@ -565,7 +638,6 @@
   </div>
 </div>
 
-<!-- 素材编辑模态框 -->
 <div class="modal-mask" id="editModal">
   <div class="modal-box">
     <h3>编辑素材属性</h3>
@@ -588,7 +660,6 @@
   </div>
 </div>
 
-<!-- 新增标签模态框 -->
 <div class="modal-mask" id="addTagModal">
   <div class="modal-box">
     <h3>新增筛选标签</h3>
@@ -600,17 +671,14 @@
     <div class="field">
       <label>匹配名称（包含）</label>
       <input id="tag_match_name" type="text" placeholder="素材名称包含此关键词">
-      <div class="field-hint">留空则不限制名称</div>
     </div>
     <div class="field">
       <label>匹配尺寸 (mm)</label>
       <input id="tag_match_size" type="number" min="5" max="100" step="1" placeholder="精确匹配尺寸">
-      <div class="field-hint">留空则不限制尺寸</div>
     </div>
     <div class="field">
       <label>匹配价格 (元)</label>
       <input id="tag_match_price" type="number" min="0" step="0.1" placeholder="精确匹配价格">
-      <div class="field-hint">留空则不限制价格</div>
     </div>
     <div class="field">
       <label>匹配五行</label>
@@ -628,10 +696,10 @@
 </div>
 
 <script>
-/* ========= 数据模型 ========= */
 let materials = [];
-let beads = [];
-let selectedSet = new Set();
+let beads = []; 
+let paths = []; 
+let selectedSet = new Set(); 
 let lastSelectedIdx = -1;
 let draggingIdx = -1;
 let dragPos = null;
@@ -639,7 +707,7 @@ let editingMatId = null;
 let idCounter = 1;
 const newId = () => 'm' + (idCounter++);
 
-const FIXED_GAP_PX = 2;
+const FIXED_GAP_PX = 0;
 
 let customTags = [];
 let tagIdCounter = 1;
@@ -650,7 +718,26 @@ let plans = [];
 let planIdCounter = 1;
 const newPlanId = () => 'p' + (planIdCounter++);
 
-/* ========= Canvas 初始化 ========= */
+let isDrawMode = false;
+let isDrawing = false;
+let currentPathPoints = [];
+let selectedPathId = null;
+
+// 新增：路径珠子选中状态
+let selectedPathBeads = new Set(); // 存储 "pathId_beadIdx"
+let lastSelectedPathBead = null; // { pathId, beadIdx }
+
+// 新增：路径珠子拖动状态
+let draggingPathBead = null; // { pathId, beadIdx }
+
+// === 新增：视图缩放与平移状态 ===
+let viewScale = 1;
+let viewOffsetX = 0;
+let viewOffsetY = 0;
+let isPanning = false;
+let panStart = { x: 0, y: 0 };
+let isSpacePressed = false; // 用于检测空格键平移
+
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
 
@@ -663,17 +750,16 @@ let DEL_ZONE_X = W - DEL_ZONE_W - 20;
 let DEL_ZONE_Y = H - DEL_ZONE_H - 20;
 
 let canvasBgColor = '#ffffff';
+let lastRingRadius = 0; 
 
-/* ========= 颜色工具 ========= */
 function hexToRgb(h){h=h.replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');return[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
 function rgbToHex(r,g,b){return '#'+[r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');}
 function lighten(hex,p){const [r,g,b]=hexToRgb(hex);return rgbToHex(r+(255-r)*p/100,g+(255-g)*p/100,b+(255-b)*p/100);}
 function darken(hex,p){const [r,g,b]=hexToRgb(hex);return rgbToHex(r*(1-p/100),g*(1-p/100),b*(1-p/100));}
 
-/* ========= 画布设置 ========= */
 function applyCanvasSettings() {
-  const newW = parseInt(document.getElementById('cvWidth').value) || 600;
-  const newH = parseInt(document.getElementById('cvHeight').value) || 600;
+  const newW = parseInt(document.getElementById('cvWidth').value) || 800;
+  const newH = parseInt(document.getElementById('cvHeight').value) || 800;
   const newBg = document.getElementById('cvBgColor').value;
   
   W = Math.max(300, Math.min(1200, newW));
@@ -695,13 +781,31 @@ function applyCanvasSettings() {
 }
 
 function resetCanvas() {
-  document.getElementById('cvWidth').value = 600;
-  document.getElementById('cvHeight').value = 600;
+  document.getElementById('cvWidth').value = 800;
+  document.getElementById('cvHeight').value = 800;
   document.getElementById('cvBgColor').value = '#ffffff';
   applyCanvasSettings();
+  resetView(); // 重置视图缩放
 }
 
-/* ========= 标签筛选逻辑 ========= */
+// === 新增：视图控制函数 ===
+function resetView() {
+  viewScale = 1;
+  viewOffsetX = 0;
+  viewOffsetY = 0;
+  render();
+}
+
+function zoomIn() {
+  viewScale = Math.min(viewScale * 1.2, 5);
+  render();
+}
+
+function zoomOut() {
+  viewScale = Math.max(viewScale / 1.2, 0.2);
+  render();
+}
+
 function matchTagRules(material, tag) {
   const rules = tag.rules;
   if (rules.name && rules.name.trim()) {
@@ -730,7 +834,6 @@ function renderTags() {
   if (!tagsContainer) return;
   
   let html = '';
-  
   const allCount = materials.length;
   html += `<div class="mat-tag-btn ${activeTagId === 'all' ? 'active' : ''}" data-tag-id="all">
     <span class="tag-name">全部</span>
@@ -740,14 +843,7 @@ function renderTags() {
   customTags.forEach(tag => {
     const count = getTagMatchCount(tag);
     const isActive = activeTagId === tag.id;
-    
-    let ruleSummary = [];
-    if (tag.rules.name) ruleSummary.push(tag.rules.name);
-    if (tag.rules.size !== '') ruleSummary.push(tag.rules.size + 'mm');
-    if (tag.rules.price !== '') ruleSummary.push('¥' + tag.rules.price);
-    if (tag.rules.wuxing) ruleSummary.push(tag.rules.wuxing);
-    
-    html += `<div class="mat-tag-btn ${isActive ? 'active' : ''}" data-tag-id="${tag.id}" title="${tag.name}\n规则: ${ruleSummary.join(', ') || '无限制'}">
+    html += `<div class="mat-tag-btn ${isActive ? 'active' : ''}" data-tag-id="${tag.id}">
       <span class="tag-name">${tag.name}</span>
       <span class="tag-count">${count}</span>
       <span class="tag-del" data-del-tag="${tag.id}">×</span>
@@ -755,7 +851,6 @@ function renderTags() {
   });
   
   html += `<div class="add-tag-btn" onclick="openAddTagModal()">＋ 新增标签</div>`;
-  
   tagsContainer.innerHTML = html;
 }
 
@@ -779,14 +874,10 @@ document.getElementById('matTags').addEventListener('click', function(e) {
     }
     return;
   }
-  
   const btn = e.target.closest('.mat-tag-btn');
-  if (btn) {
-    selectTag(btn.dataset.tagId);
-  }
+  if (btn) selectTag(btn.dataset.tagId);
 });
 
-/* ========= 新增标签模态框 ========= */
 function openAddTagModal() {
   document.getElementById('tag_name').value = '';
   document.getElementById('tag_match_name').value = '';
@@ -803,58 +894,43 @@ function closeAddTagModal() {
 function saveNewTag() {
   const name = document.getElementById('tag_name').value.trim();
   if (!name) { alert('请输入标签名称'); return; }
-  
   const matchName = document.getElementById('tag_match_name').value.trim();
   const matchSize = document.getElementById('tag_match_size').value;
   const matchPrice = document.getElementById('tag_match_price').value;
   const matchWuxing = document.getElementById('tag_match_wuxing').value;
   
   if (!matchName && !matchSize && !matchPrice && !matchWuxing) {
-    alert('请至少设置一个匹配规则');
-    return;
+    alert('请至少设置一个匹配规则'); return;
   }
   
-  const tag = {
-    id: newTagId(),
-    name: name,
-    rules: {
-      name: matchName,
-      size: matchSize ? parseFloat(matchSize) : '',
-      price: matchPrice ? parseFloat(matchPrice) : '',
-      wuxing: matchWuxing
-    }
-  };
-  
-  customTags.push(tag);
+  customTags.push({
+    id: newTagId(), name: name,
+    rules: { name: matchName, size: matchSize ? parseFloat(matchSize) : '', price: matchPrice ? parseFloat(matchPrice) : '', wuxing: matchWuxing }
+  });
   closeAddTagModal();
   renderTags();
   renderMaterials();
 }
 
-/* ========= 搜索匹配逻辑 ========= */
 function matchMaterial(m, query) {
   if (!query) return true;
   const q = query.trim();
   if (!q) return true;
   const ql = q.toLowerCase();
-
   const rangeMatch = q.match(/^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$/);
   if (rangeMatch) {
     const min = parseFloat(rangeMatch[1]);
     const max = parseFloat(rangeMatch[2]);
     return m.price >= min && m.price <= max;
   }
-
   if (/^\d+(?:\.\d+)?$/.test(q)) {
     const val = parseFloat(q);
     if (m.price === val) return true;
   }
-
   const fields = [m.name, m.size.toString(), m.color, m.remark || '', m.wuxing].map(f => f.toLowerCase());
   return fields.some(f => f.includes(ql));
 }
 
-/* ========= 布局计算 ========= */
 function computeLayout() {
   const N = beads.length;
   if (N === 0) return { R: 0, angles: [], centers: [], viewScale: 1, totalCircumference: 0 };
@@ -870,8 +946,8 @@ function computeLayout() {
   
   let R = totalCircumference / (2 * Math.PI);
   const maxR = Math.min(W, H) / 2 - 40; 
-  let viewScale = 1;
-  if (R > maxR) viewScale = maxR / R;
+  let layoutViewScale = 1;
+  if (R > maxR) layoutViewScale = maxR / R;
   
   const angles = [];
   const centers = [];
@@ -882,72 +958,297 @@ function computeLayout() {
     const centerArc = currentArc + sizes[i] / 2;
     const angle = baseAngle + (centerArc / totalCircumference) * 2 * Math.PI;
     angles.push(angle);
-    
-    const rcx = CX + (R * viewScale) * Math.cos(angle);
-    const rcy = CY + (R * viewScale) * Math.sin(angle);
-    
+    const rcx = CX + (R * layoutViewScale) * Math.cos(angle);
+    const rcy = CY + (R * layoutViewScale) * Math.sin(angle);
     centers.push({ rx: rcx, ry: rcy, size: sizes[i] });
     currentArc += sizes[i] + FIXED_GAP_PX;
   }
-  
-  return { R, angles, centers, viewScale, totalCircumference };
+  return { R, angles, centers, viewScale: layoutViewScale, totalCircumference };
 }
 
-/* ========= 渲染 ========= */
+// 重构：物理逻辑排列路径珠子
+function getPathBeadCenters(path) {
+  if (!path.points || path.points.length < 2 || path.beads.length === 0) return [];
+  
+  const pts = path.points;
+  const densePoints = [pts[0]];
+  const cumLengths = [0];
+  const sampleStep = 1; 
+  
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i];
+    const p1 = pts[i+1];
+    const dx = p1.x - p0.x;
+    const dy = p1.y - p0.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const steps = Math.max(1, Math.ceil(dist / sampleStep));
+    
+    for (let j = 1; j <= steps; j++) {
+      const t = j / steps;
+      densePoints.push({ x: p0.x + dx * t, y: p0.y + dy * t });
+    }
+  }
+  
+  for (let i = 1; i < densePoints.length; i++) {
+    const dx = densePoints[i].x - densePoints[i-1].x;
+    const dy = densePoints[i].y - densePoints[i-1].y;
+    cumLengths.push(cumLengths[i-1] + Math.sqrt(dx*dx + dy*dy));
+  }
+  
+  const totalLen = cumLengths[cumLengths.length - 1];
+  if (totalLen === 0) return [];
+
+  function getPointAtLength(len) {
+    if (len <= 0) return densePoints[0];
+    if (len >= totalLen) return densePoints[densePoints.length - 1];
+    let left = 0, right = cumLengths.length - 1;
+    while (left < right - 1) {
+      const mid = Math.floor((left + right) / 2);
+      if (cumLengths[mid] <= len) left = mid;
+      else right = mid;
+    }
+    const segLen = cumLengths[right] - cumLengths[left];
+    const t = segLen > 0 ? (len - cumLengths[left]) / segLen : 0;
+    return {
+      x: densePoints[left].x + (densePoints[right].x - densePoints[left].x) * t,
+      y: densePoints[left].y + (densePoints[right].y - densePoints[left].y) * t
+    };
+  }
+
+  const beadCenters = [];
+  let currentArc = 0; 
+  
+  for (let i = 0; i < path.beads.length; i++) {
+    const b = path.beads[i];
+    const m = materials.find(x => x.id === b.materialId);
+    if (!m) continue;
+    
+    const radius = ((m.size || 20) * b.scale) / 2;
+    
+    if (i > 0) {
+      const prevB = path.beads[i-1];
+      const prevM = materials.find(x => x.id === prevB.materialId);
+      if (prevM) {
+        const prevRadius = ((prevM.size || 20) * prevB.scale) / 2;
+        currentArc += prevRadius + radius + FIXED_GAP_PX;
+      }
+    }
+    
+    if (currentArc > totalLen) break; 
+    
+    const pt = getPointAtLength(currentArc);
+    beadCenters.push({ x: pt.x, y: pt.y, size: radius * 2 });
+  }
+  return beadCenters;
+}
+
+// 新增：计算鼠标位置在路径上的投影弧长
+function getProjectionLengthOnPath(points, mx, my) {
+  if (!points || points.length < 2) return 0;
+  let minDist = Infinity;
+  let bestLen = 0;
+  
+  const densePoints = [points[0]];
+  const cumLengths = [0];
+  const sampleStep = 2;
+  
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i];
+    const p1 = points[i+1];
+    const dx = p1.x - p0.x;
+    const dy = p1.y - p0.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const steps = Math.max(1, Math.ceil(dist / sampleStep));
+    
+    for (let j = 1; j <= steps; j++) {
+      const t = j / steps;
+      densePoints.push({ x: p0.x + dx * t, y: p0.y + dy * t });
+    }
+  }
+  
+  for (let i = 1; i < densePoints.length; i++) {
+    const dx = densePoints[i].x - densePoints[i-1].x;
+    const dy = densePoints[i].y - densePoints[i-1].y;
+    cumLengths.push(cumLengths[i-1] + Math.sqrt(dx*dx + dy*dy));
+  }
+  
+  for (let i = 0; i < densePoints.length; i++) {
+    const dx = mx - densePoints[i].x;
+    const dy = my - densePoints[i].y;
+    const dist = dx*dx + dy*dy;
+    if (dist < minDist) {
+      minDist = dist;
+      bestLen = cumLengths[i];
+    }
+  }
+  
+  return bestLen;
+}
+
 function render() {
   ctx.clearRect(0, 0, W, H);
   
+  // 1. 绘制背景 (不受缩放影响，始终填满 Canvas)
   const bg = ctx.createRadialGradient(CX, CY, 50, CX, CY, Math.max(W, H) * 0.6);
   bg.addColorStop(0, lighten(canvasBgColor, 8));
   bg.addColorStop(1, canvasBgColor);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
-  if (beads.length === 0) {
+  // 2. 应用视图变换
+  ctx.save();
+  ctx.translate(viewOffsetX, viewOffsetY);
+  ctx.scale(viewScale, viewScale);
+
+  // 3. 绘制内容 (受缩放影响)
+  if (beads.length > 0) {
+    const layout = computeLayout();
+    const { R, centers, viewScale: layoutVS } = layout;
+    lastRingRadius = R * layoutVS;
+
+    ctx.beginPath();
+    ctx.arc(CX, CY, R * layoutVS, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(160,210,235,0.35)';
+    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    beads.forEach((b, i) => {
+      if (i === draggingIdx) return;
+      const c = centers[i];
+      drawBead(b, c.rx, c.ry, selectedSet.has(i), layoutVS);
+    });
+  } else {
+    lastRingRadius = 0;
     ctx.fillStyle = '#a0b4c0';
     ctx.font = '14px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('点击右侧素材添加珠子', CX, CY);
-    updateStats();
-    updateSelectedBeadText();
-    return;
   }
 
-  const layout = computeLayout();
-  const { R, centers, viewScale } = layout;
-
-  ctx.beginPath();
-  ctx.arc(CX, CY, R * viewScale, 0, Math.PI*2);
-  ctx.strokeStyle = 'rgba(160,210,235,0.35)';
-  ctx.setLineDash([4, 4]);
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  beads.forEach((b, i) => {
-    if (i === draggingIdx) return;
-    const c = centers[i];
-    drawBead(b, c.rx, c.ry, selectedSet.has(i), viewScale);
+  paths.forEach(path => {
+      const isSelected = path.id === selectedPathId;
+      const isLocked = selectedPathId !== null && !isSelected;
+      
+      ctx.save();
+      if (isLocked) ctx.globalAlpha = 0.3;
+      
+      if (path.points.length > 1) {
+          ctx.beginPath();
+          ctx.moveTo(path.points[0].x, path.points[0].y);
+          for (let i = 1; i < path.points.length - 1; i++) {
+              const xc = (path.points[i].x + path.points[i+1].x) / 2;
+              const yc = (path.points[i].y + path.points[i+1].y) / 2;
+              ctx.quadraticCurveTo(path.points[i].x, path.points[i].y, xc, yc);
+          }
+          const last = path.points[path.points.length-1];
+          ctx.lineTo(last.x, last.y);
+          
+          ctx.strokeStyle = isSelected ? '#2c5f7c' : '#a0d2eb';
+          ctx.lineWidth = isSelected ? 2 : 1;
+          ctx.setLineDash([5, 5]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+      }
+      
+      const beadCenters = getPathBeadCenters(path);
+      const count = Math.min(path.beads.length, beadCenters.length);
+      for(let i=0; i<count; i++) {
+          // 跳过正在拖动的路径珠子
+          if (draggingPathBead && draggingPathBead.pathId === path.id && draggingPathBead.beadIdx === i) continue;
+          
+          const b = path.beads[i];
+          const c = beadCenters[i];
+          const isPathBeadSelected = selectedPathBeads.has(path.id + '_' + i);
+          drawBead(b, c.x, c.y, isPathBeadSelected, 1); 
+      }
+      ctx.restore();
   });
 
+  // 新增：绘制正在拖动的路径珠子及删除区域
+  if (draggingPathBead && dragPos) {
+      const path = paths.find(p => p.id === draggingPathBead.pathId);
+      if (path && path.beads[draggingPathBead.beadIdx]) {
+          const b = path.beads[draggingPathBead.beadIdx];
+          // 删除区域也需要应用变换吗？不，删除区域是UI层，应该在变换之外绘制，或者在这里反向计算。
+          // 为了简单，我们在 restore 之后绘制 UI 层。
+      }
+  }
+
+  if (isDrawing && currentPathPoints.length > 0) {
+      ctx.beginPath();
+      ctx.moveTo(currentPathPoints[0].x, currentPathPoints[0].y);
+      for (let i = 1; i < currentPathPoints.length; i++) {
+          ctx.lineTo(currentPathPoints[i].x, currentPathPoints[i].y);
+      }
+      ctx.strokeStyle = '#2c5f7c';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+  }
+
+  if (draggingIdx >= 0 && dragPos) {
+    // 同样，拖动预览在 restore 后绘制更简单，或者在这里绘制但要注意坐标
+  }
+
+  ctx.restore(); // 恢复变换，以下绘制 UI 层（删除区等）
+
+  // 4. 绘制 UI 层 (删除区域等，不受缩放影响，保持在屏幕固定位置)
+  // 注意：如果希望删除区域也随画布移动，则需要保留在变换内。
+  // 通常删除区域是固定在屏幕右下角的，所以放在 restore 之后。
+  
+  // 绘制路径珠子拖动预览
+  if (draggingPathBead && dragPos) {
+      const path = paths.find(p => p.id === draggingPathBead.pathId);
+      if (path && path.beads[draggingPathBead.beadIdx]) {
+          const b = path.beads[draggingPathBead.beadIdx];
+          const isInDelZone = dragPos.x >= DEL_ZONE_X && dragPos.x <= DEL_ZONE_X + DEL_ZONE_W &&
+                              dragPos.y >= DEL_ZONE_Y && dragPos.y <= DEL_ZONE_Y + DEL_ZONE_H;
+          
+          ctx.fillStyle = isInDelZone ? 'rgba(255, 0, 0, 0.7)' : 'rgba(255, 0, 0, 0.4)';
+          ctx.fillRect(DEL_ZONE_X, DEL_ZONE_Y, DEL_ZONE_W, DEL_ZONE_H);
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(DEL_ZONE_X, DEL_ZONE_Y, DEL_ZONE_W, DEL_ZONE_H);
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 16px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(isInDelZone ? '松开删除' : '拖至此处删除', DEL_ZONE_X + DEL_ZONE_W/2, DEL_ZONE_Y + DEL_ZONE_H/2);
+
+          // 注意：这里的 dragPos 是屏幕坐标，drawBead 期望的是世界坐标。
+          // 如果需要珠子跟随鼠标，且鼠标是屏幕坐标，我们需要反向变换，或者让 drawBead 接受屏幕坐标。
+          // 简单起见，我们假设 dragPos 已经是世界坐标（通过 getMouse 转换）。
+          // 但是 getMouse 现在返回的是世界坐标。
+          drawBead(b, dragPos.x, dragPos.y, true, 1);
+      }
+  }
+
+  // 绘制圆环珠子拖动预览
   if (draggingIdx >= 0 && dragPos) {
     const isInDelZone = dragPos.x >= DEL_ZONE_X && dragPos.x <= DEL_ZONE_X + DEL_ZONE_W &&
                         dragPos.y >= DEL_ZONE_Y && dragPos.y <= DEL_ZONE_Y + DEL_ZONE_H;
-    
     ctx.fillStyle = isInDelZone ? 'rgba(255, 0, 0, 0.7)' : 'rgba(255, 0, 0, 0.4)';
     ctx.fillRect(DEL_ZONE_X, DEL_ZONE_Y, DEL_ZONE_W, DEL_ZONE_H);
-    
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
     ctx.lineWidth = 2;
     ctx.strokeRect(DEL_ZONE_X, DEL_ZONE_Y, DEL_ZONE_W, DEL_ZONE_H);
-    
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 16px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(isInDelZone ? '松开删除' : '拖至此处删除', DEL_ZONE_X + DEL_ZONE_W/2, DEL_ZONE_Y + DEL_ZONE_H/2);
 
-    drawBead(beads[draggingIdx], dragPos.x, dragPos.y, true, viewScale);
+    const layout = computeLayout();
+    // dragPos 是世界坐标，但 drawBead 内部没有应用 viewScale，因为它是在 restore 后调用的？
+    // 不，之前的逻辑是 drawBead 在 transform 内调用。
+    // 现在我们将拖动预览放在 restore 后，所以需要手动应用变换，或者重新进入 transform。
+    // 为了保持一致性，我们重新进入 transform 来绘制这个珠子。
+    ctx.save();
+    ctx.translate(viewOffsetX, viewOffsetY);
+    ctx.scale(viewScale, viewScale);
+    drawBead(beads[draggingIdx], dragPos.x, dragPos.y, true, layout.viewScale);
+    ctx.restore();
   }
 
   updateStats();
@@ -1004,59 +1305,85 @@ function drawBead(b, x, y, selected, viewScale = 1) {
     ctx.stroke();
     ctx.setLineDash([]);
   }
-
   ctx.restore();
 }
 
-/* ========= 统计 ========= */
 function updateStats() {
-  document.getElementById('statCount').innerText = beads.length;
-  let totalLen = 0, totalPrice = 0;
+  let totalCount = beads.length;
+  let totalLen = 0;
+  let totalPrice = 0;
   beads.forEach(b => {
     const m = materials.find(x => x.id === b.materialId);
-    if (m) {
-      totalLen += (m.size || 20) * b.scale;
-      totalPrice += (m.price || 0);
-    }
+    if (m) { totalLen += (m.size || 20) * b.scale; totalPrice += (m.price || 0); }
   });
   totalLen += beads.length * FIXED_GAP_PX; 
-  
+  paths.forEach(p => {
+      totalCount += p.beads.length;
+      p.beads.forEach(b => {
+          const m = materials.find(x => x.id === b.materialId);
+          if (m) { totalLen += (m.size || 20) * b.scale; totalPrice += (m.price || 0); }
+      });
+  });
+  document.getElementById('statCount').innerText = totalCount;
   document.getElementById('statLen').innerText = Math.round(totalLen);
   document.getElementById('statPrice').innerText = totalPrice.toFixed(1);
 }
 
-/* ========= 选中珠子简洁文字展示 ========= */
 function updateSelectedBeadText() {
   const container = document.getElementById('selectedBeadText');
-  
-  if (selectedSet.size === 0) {
+  if (selectedSet.size === 0 && selectedPathBeads.size === 0) {
     container.className = 'selected-bead-text empty';
     container.innerHTML = '点击画布上的珠子查看所选信息';
     return;
   }
-  
   container.className = 'selected-bead-text';
-  
-  let html = '<span style="color:#667;font-size:12px;margin-right:8px;">已选中 ' + selectedSet.size + ' 颗：</span>';
-  
+  let html = '<span style="color:#667;font-size:12px;margin-right:8px;">已选中 ' + (selectedSet.size + selectedPathBeads.size) + ' 颗：</span>';
   selectedSet.forEach(idx => {
-    const bead = beads[idx];
-    if (!bead) return;
-    
+    const bead = beads[idx]; if (!bead) return;
     const m = materials.find(x => x.id === bead.materialId);
-    if (!m) return;
-    
-    html += `<span class="bead-tag">${m.name}</span>`;
+    if (m) html += `<span class="bead-tag">${m.name}</span>`;
   });
-  
+  selectedPathBeads.forEach(key => {
+    const [pid, bidx] = key.split('_');
+    const p = paths.find(x => x.id === pid);
+    if (p && p.beads[bidx]) {
+      const m = materials.find(x => x.id === p.beads[bidx].materialId);
+      if (m) html += `<span class="bead-tag">${m.name}(路径)</span>`;
+    }
+  });
   container.innerHTML = html;
 }
 
-/* ========= 鼠标交互 ========= */
+// === 修改：坐标转换 ===
 function getMouse(e) {
   const rect = cv.getBoundingClientRect();
-  const sx = cv.width / rect.width, sy = cv.height / rect.height;
-  return { x: (e.clientX - rect.left) * sx, y: (e.clientY - rect.top) * sy };
+  // 屏幕坐标相对于 Canvas 左上角
+  const screenX = (e.clientX - rect.left) * (cv.width / rect.width);
+  const screenY = (e.clientY - rect.top) * (cv.height / rect.height);
+  
+  // 转换为世界坐标 (减去偏移，除以缩放)
+  const worldX = (screenX - viewOffsetX) / viewScale;
+  const worldY = (screenY - viewOffsetY) / viewScale;
+  
+  return { x: worldX, y: worldY, screenX, screenY };
+}
+
+// 新增：检测路径珠子点击
+function hitPathBead(mx, my) {
+  for (let pIdx = paths.length - 1; pIdx >= 0; pIdx--) {
+    const path = paths[pIdx];
+    const centers = getPathBeadCenters(path);
+    for (let i = centers.length - 1; i >= 0; i--) {
+      const c = centers[i];
+      const b = path.beads[i];
+      const m = materials.find(x => x.id === b.materialId);
+      if (!m) continue;
+      const r = ((m.size || 20) * b.scale) / 2; 
+      const dx = mx - c.x, dy = my - c.y;
+      if (dx*dx + dy*dy <= r*r) return { pathId: path.id, beadIdx: i };
+    }
+  }
+  return null;
 }
 
 function hitBead(mx, my) {
@@ -1073,11 +1400,62 @@ function hitBead(mx, my) {
   return -1;
 }
 
+// === 修改：鼠标事件处理 ===
 cv.addEventListener('mousedown', e => {
   const p = getMouse(e);
-  const idx = hitBead(p.x, p.y);
   
+  // 1. 处理画布平移 (空格键 或 中键)
+  if (isSpacePressed || e.button === 1) {
+    isPanning = true;
+    panStart = { x: e.clientX, y: e.clientY };
+    cv.classList.add('panning');
+    e.preventDefault(); // 防止中键滚动
+    return;
+  }
+
+  if (isDrawMode) {
+      isDrawing = true;
+      currentPathPoints = [p]; // p 是世界坐标
+      cv.classList.add('drawing');
+      return;
+  }
+
+  // 2. 优先检测路径珠子
+  const pathBeadHit = hitPathBead(p.x, p.y);
+  if (pathBeadHit) {
+    const key = pathBeadHit.pathId + '_' + pathBeadHit.beadIdx;
+    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+      if (selectedPathBeads.has(key)) selectedPathBeads.delete(key);
+      else selectedPathBeads.add(key);
+      lastSelectedPathBead = pathBeadHit;
+    } else {
+      selectedPathBeads.clear();
+      selectedPathBeads.add(key);
+      lastSelectedPathBead = pathBeadHit;
+    }
+    selectedSet.clear();
+    lastSelectedIdx = -1;
+    selectedPathId = pathBeadHit.pathId;
+    
+    // 新增：开始拖动路径珠子
+    draggingPathBead = pathBeadHit;
+    dragPos = { x: p.x, y: p.y }; // 世界坐标
+    cv.classList.add('dragging');
+    
+    renderPathList();
+    updatePathEditControls();
+    updateAdjustPanel();
+    render();
+    return;
+  }
+
+  // 3. 检测圆环珠子
+  const idx = hitBead(p.x, p.y);
   if (idx >= 0) {
+    // 清空路径珠子选中
+    selectedPathBeads.clear();
+    lastSelectedPathBead = null;
+
     if (e.shiftKey || e.ctrlKey || e.metaKey) {
       if (selectedSet.has(idx)) {
         selectedSet.delete(idx);
@@ -1093,13 +1471,19 @@ cv.addEventListener('mousedown', e => {
       }
       lastSelectedIdx = idx;
     }
-    
     draggingIdx = idx;
-    dragPos = { x: p.x, y: p.y };
+    dragPos = { x: p.x, y: p.y }; // 世界坐标
     cv.classList.add('dragging');
     updateAdjustPanel();
     render();
   } else {
+    // 点击空白处：如果不是绘图模式，可以视为取消选择或开始平移（如果配置了）
+    // 这里保持原有逻辑：取消选择
+    selectedPathId = null;
+    selectedPathBeads.clear();
+    lastSelectedPathBead = null;
+    renderPathList();
+    updatePathEditControls();
     selectedSet.clear();
     lastSelectedIdx = -1;
     updateAdjustPanel();
@@ -1108,24 +1492,135 @@ cv.addEventListener('mousedown', e => {
 });
 
 cv.addEventListener('mousemove', e => {
+  const p = getMouse(e);
+  
+  // 处理画布平移
+  if (isPanning) {
+    const dx = e.clientX - panStart.x;
+    const dy = e.clientY - panStart.y;
+    viewOffsetX += dx;
+    viewOffsetY += dy;
+    panStart = { x: e.clientX, y: e.clientY };
+    render();
+    return;
+  }
+
+  if (isDrawing) {
+      currentPathPoints.push(p); // p 是世界坐标
+      render();
+      return;
+  }
+  
+  // 新增：拖动路径珠子
+  if (draggingPathBead) {
+      dragPos = p; // p 是世界坐标
+      render();
+      return;
+  }
+  
   if (draggingIdx < 0) return;
-  dragPos = getMouse(e);
+  dragPos = p; // p 是世界坐标
   render();
 });
 
 cv.addEventListener('mouseup', e => {
-  if (draggingIdx < 0) return;
+  // 结束平移
+  if (isPanning) {
+    isPanning = false;
+    cv.classList.remove('panning');
+    return;
+  }
+
   const p = getMouse(e);
-  
-  const isInDelZone = p.x >= DEL_ZONE_X && p.x <= DEL_ZONE_X + DEL_ZONE_W &&
-                      p.y >= DEL_ZONE_Y && p.y <= DEL_ZONE_Y + DEL_ZONE_H;
-  
+  if (isDrawing) {
+      isDrawing = false;
+      cv.classList.remove('drawing');
+      if (currentPathPoints.length > 5) {
+          const newPath = {
+              id: 'path_' + Date.now(),
+              points: [...currentPathPoints],
+              beads: [] 
+          };
+          paths.push(newPath);
+          selectedPathId = newPath.id;
+          renderPathList();
+          updatePathEditControls();
+      }
+      currentPathPoints = [];
+      render();
+      return;
+  }
+
+  // 新增：结束拖动路径珠子
+  if (draggingPathBead) {
+      const isInDelZone = p.screenX >= DEL_ZONE_X && p.screenX <= DEL_ZONE_X + DEL_ZONE_W &&
+                          p.screenY >= DEL_ZONE_Y && p.screenY <= DEL_ZONE_Y + DEL_ZONE_H;
+      
+      const path = paths.find(x => x.id === draggingPathBead.pathId);
+      if (path) {
+          if (isInDelZone) {
+              // 删除珠子
+              const deletedBead = path.beads[draggingPathBead.beadIdx];
+              const m = materials.find(x => x.id === deletedBead.materialId);
+              if (m) m.stock = (m.stock || 0) + 1;
+              
+              path.beads.splice(draggingPathBead.beadIdx, 1);
+              
+              selectedPathBeads.clear();
+              lastSelectedPathBead = null;
+              renderMaterials();
+          } else {
+              // 在路径上重新计算位置并排序
+              const targetArc = getProjectionLengthOnPath(path.points, p.x, p.y);
+              
+              let arcs = [];
+              let cArc = 0;
+              for(let i=0; i<path.beads.length; i++){
+                  const b = path.beads[i];
+                  const m = materials.find(x => x.id === b.materialId);
+                  if(!m) continue;
+                  const r = ((m.size||20)*b.scale)/2;
+                  if(i>0){
+                      const pb = path.beads[i-1];
+                      const pm = materials.find(x=>x.id===pb.materialId);
+                      if(pm){
+                          const pr = ((pm.size||20)*pb.scale)/2;
+                          cArc += pr + r + FIXED_GAP_PX;
+                      }
+                  }
+                  arcs.push({ bead: b, arc: cArc, isDragging: i === draggingPathBead.beadIdx });
+                  cArc += r * 2; 
+              }
+              
+              const dragArcObj = arcs.find(a => a.isDragging);
+              if(dragArcObj) dragArcObj.arc = targetArc;
+              
+              arcs.sort((a, b) => a.arc - b.arc);
+              
+              path.beads = arcs.map(a => a.bead);
+              
+              const newIdx = path.beads.indexOf(dragArcObj.bead);
+              selectedPathBeads.clear();
+              selectedPathBeads.add(path.id + '_' + newIdx);
+              lastSelectedPathBead = { pathId: path.id, beadIdx: newIdx };
+          }
+      }
+      
+      draggingPathBead = null;
+      dragPos = null;
+      cv.classList.remove('dragging');
+      updateAdjustPanel();
+      render();
+      return;
+  }
+
+  if (draggingIdx < 0) return;
+  const isInDelZone = p.screenX >= DEL_ZONE_X && p.screenX <= DEL_ZONE_X + DEL_ZONE_W &&
+                      p.screenY >= DEL_ZONE_Y && p.screenY <= DEL_ZONE_Y + DEL_ZONE_H;
   if (isInDelZone) {
-    // 删除珠子，恢复库存
     const deletedBead = beads[draggingIdx];
     const m = materials.find(x => x.id === deletedBead.materialId);
     if (m) m.stock = (m.stock || 0) + 1;
-    
     beads.splice(draggingIdx, 1);
     const newSet = new Set();
     selectedSet.forEach(i => {
@@ -1134,39 +1629,31 @@ cv.addEventListener('mouseup', e => {
     });
     selectedSet = newSet;
     lastSelectedIdx = -1;
-    
-    renderMaterials(); // 更新素材列表显示
+    renderMaterials();
   } else {
     const layout = computeLayout();
+    // 注意：这里计算角度需要基于中心点 CX, CY，它们是逻辑坐标
     const dx = p.x - CX, dy = p.y - CY;
     let ang = Math.atan2(dy, dx);
     const baseAngle = -Math.PI / 2;
     let rel = ang - baseAngle;
     while (rel < 0) rel += Math.PI*2;
     while (rel >= Math.PI*2) rel -= Math.PI*2;
-    
     const targetArc = (rel / (Math.PI * 2)) * layout.totalCircumference;
-    
     let currentArc = 0;
     let slot = beads.length;
     for (let i = 0; i < beads.length; i++) {
       const size = layout.centers[i].size;
-      if (targetArc < currentArc + size + FIXED_GAP_PX) {
-        slot = i;
-        break;
-      }
+      if (targetArc < currentArc + size + FIXED_GAP_PX) { slot = i; break; }
       currentArc += size + FIXED_GAP_PX;
     }
-    
     const moved = beads.splice(draggingIdx, 1)[0];
     if (slot > beads.length) slot = beads.length;
     beads.splice(slot, 0, moved);
-    
     const newSet = new Set();
     selectedSet.forEach(i => {
-      if (i === draggingIdx) {
-        newSet.add(slot);
-      } else {
+      if (i === draggingIdx) newSet.add(slot);
+      else {
         let newI = i;
         if (i > draggingIdx) newI--;
         if (newI >= slot) newI++;
@@ -1176,7 +1663,6 @@ cv.addEventListener('mouseup', e => {
     selectedSet = newSet;
     lastSelectedIdx = slot;
   }
-  
   draggingIdx = -1;
   dragPos = null;
   cv.classList.remove('dragging');
@@ -1185,169 +1671,263 @@ cv.addEventListener('mouseup', e => {
 });
 
 cv.addEventListener('mouseleave', () => {
-  if (draggingIdx >= 0) {
-    draggingIdx = -1; dragPos = null;
-    cv.classList.remove('dragging');
-    render();
+  if (isDrawing) { isDrawing = false; currentPathPoints = []; render(); }
+  if (draggingIdx >= 0) { draggingIdx = -1; dragPos = null; cv.classList.remove('dragging'); render(); }
+  if (draggingPathBead) { draggingPathBead = null; dragPos = null; cv.classList.remove('dragging'); render(); }
+  if (isPanning) { isPanning = false; cv.classList.remove('panning'); }
+});
+
+// === 新增：滚轮缩放 ===
+cv.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = cv.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+  
+  const zoomIntensity = 0.1;
+  const delta = e.deltaY > 0 ? -1 : 1;
+  const factor = 1 + (delta * zoomIntensity);
+  
+  const newScale = Math.max(0.2, Math.min(5, viewScale * factor));
+  
+  // 以鼠标为中心缩放
+  // 公式: offset = mouse - (mouse - oldOffset) * (newScale / oldScale)
+  viewOffsetX = mouseX - (mouseX - viewOffsetX) * (newScale / viewScale);
+  viewOffsetY = mouseY - (mouseY - viewOffsetY) * (newScale / viewScale);
+  viewScale = newScale;
+  
+  render();
+}, { passive: false });
+
+// === 新增：键盘事件监听空格 ===
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space') {
+    isSpacePressed = true;
+    cv.style.cursor = 'grab';
   }
 });
 
-/* ========= 珠子调整面板 (优化版：滑块流畅 + 直径可编辑) ========= */
+window.addEventListener('keyup', e => {
+  if (e.code === 'Space') {
+    isSpacePressed = false;
+    cv.style.cursor = ''; // 恢复默认
+    if (!isPanning) cv.classList.remove('panning');
+  }
+});
+
+function toggleDrawMode() {
+    isDrawMode = !isDrawMode;
+    const btn = document.getElementById('drawModeBtn');
+    if (isDrawMode) {
+        btn.classList.add('btn-active');
+        btn.innerText = '✏️ 手绘中...';
+        cv.classList.add('drawing');
+    } else {
+        btn.classList.remove('btn-active');
+        btn.innerText = '✏️ 开启手绘';
+        cv.classList.remove('drawing');
+    }
+}
+
+function renderPathList() {
+    const list = document.getElementById('pathList');
+    if (paths.length === 0) {
+        list.innerHTML = '<div style="text-align:center;color:#99a;font-size:11px;padding:12px">暂无手绘路径</div>';
+        document.getElementById('pathEditControls').style.display = 'none';
+        return;
+    }
+    list.innerHTML = paths.map(p => `
+        <div class="path-item ${p.id === selectedPathId ? 'active' : ''}" onclick="selectPath('${p.id}')">
+            <div class="path-info">
+                <strong>路径 #${p.id.slice(-4)}</strong>
+                <div style="font-size:10px;color:#889">${p.beads.length} 颗珠子</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function selectPath(id) {
+    selectedPathId = id;
+    renderPathList();
+    updatePathEditControls();
+    render();
+}
+
+function updatePathEditControls() {
+    const panel = document.getElementById('pathEditControls');
+    panel.style.display = selectedPathId ? 'block' : 'none';
+}
+
+function deleteSelectedPath() {
+    if (!selectedPathId) return;
+    if (!confirm('确定删除此路径及其上的所有珠子？')) return;
+    const path = paths.find(p => p.id === selectedPathId);
+    if (path) {
+        path.beads.forEach(b => {
+            const m = materials.find(x => x.id === b.materialId);
+            if (m) m.stock = (m.stock || 0) + 1;
+        });
+    }
+    paths = paths.filter(p => p.id !== selectedPathId);
+    selectedPathId = null;
+    selectedPathBeads.clear();
+    lastSelectedPathBead = null;
+    renderPathList();
+    updatePathEditControls();
+    updateAdjustPanel();
+    renderMaterials();
+    render();
+}
+
+// 重构：支持路径珠子调整
 function updateAdjustPanel() {
   const body = document.getElementById('adjustBody');
   let html = '';
+  const ringCount = selectedSet.size;
+  const pathCount = selectedPathBeads.size;
+  const totalCount = ringCount + pathCount;
   
-  const count = selectedSet.size;
-  if (count === 0) {
+  if (totalCount === 0) {
     html += `<div class="no-select-tip">点击画布上的珠子以选中（按住 Shift/Ctrl 可多选）</div>`;
   } else {
     let initScale = 1, initRot = 0, currentSize = 0;
-    // 获取最后一个选中珠子的基础信息
-    if (lastSelectedIdx >= 0 && beads[lastSelectedIdx]) {
+    if (ringCount > 0 && lastSelectedIdx >= 0 && beads[lastSelectedIdx]) {
       initScale = beads[lastSelectedIdx].scale;
       initRot = beads[lastSelectedIdx].rotation;
       const m = materials.find(x => x.id === beads[lastSelectedIdx].materialId);
       if (m) currentSize = (m.size || 0) * initScale;
+    } else if (pathCount > 0 && lastSelectedPathBead) {
+      const path = paths.find(p => p.id === lastSelectedPathBead.pathId);
+      if (path && path.beads[lastSelectedPathBead.beadIdx]) {
+        const b = path.beads[lastSelectedPathBead.beadIdx];
+        initScale = b.scale;
+        initRot = b.rotation;
+        const m = materials.find(x => x.id === b.materialId);
+        if (m) currentSize = (m.size || 0) * initScale;
+      }
     }
-    
-    // 1. 尺寸缩放行：右侧改为可编辑的输入框，显示直径
     html += `
       <div class="ctrl-row">
         <label>尺寸缩放</label>
         <input type="range" id="sScale" min="1.0" max="3.0" step="0.05" value="${initScale}">
-        <!-- 这里是一个普通的数字输入框，用于显示和修改直径 -->
-        <input type="number" class="ctrl-input" id="iSizeDisplay" 
-               value="${currentSize.toFixed(1)}" 
-               style="width:70px; text-align:right;" 
-               title="输入目标直径(mm)">
+        <input type="number" class="ctrl-input" id="iSizeDisplay" value="${currentSize.toFixed(1)}" style="width:70px; text-align:right;" title="输入目标直径(mm)">
         <span style="font-size:11px; color:#99a; width:20px;">mm</span>
-      </div>`;
-    
-    // 旋转角度行保持不变
-    html += `
+      </div>
       <div class="ctrl-row">
         <label>旋转角度</label>
         <input type="range" id="sRot" min="-180" max="180" step="1" value="${initRot}">
         <input type="number" class="ctrl-input" id="iRot" min="-180" max="180" step="1" value="${initRot}">°
       </div>`;
   }
-  
   body.innerHTML = html;
   
-  if (count > 0) {
+  if (totalCount > 0) {
     const scaleSlider = document.getElementById('sScale');
-    const sizeInput = document.getElementById('iSizeDisplay'); // 新的直径输入框
+    const sizeInput = document.getElementById('iSizeDisplay');
     const rotSlider = document.getElementById('sRot');
     const rotInput = document.getElementById('iRot');
     
-    // 辅助函数：获取基础尺寸
     const getBaseSize = () => {
-      if (lastSelectedIdx >= 0 && beads[lastSelectedIdx]) {
+      if (ringCount > 0 && lastSelectedIdx >= 0 && beads[lastSelectedIdx]) {
         const m = materials.find(x => x.id === beads[lastSelectedIdx].materialId);
         return m ? (m.size || 0) : 0;
+      } else if (pathCount > 0 && lastSelectedPathBead) {
+        const path = paths.find(p => p.id === lastSelectedPathBead.pathId);
+        if (path && path.beads[lastSelectedPathBead.beadIdx]) {
+          const m = materials.find(x => x.id === path.beads[lastSelectedPathBead.beadIdx].materialId);
+          return m ? (m.size || 0) : 0;
+        }
       }
       return 0;
     };
 
-    // 2. 滑块拖动逻辑 (只更新数据和输入框显示，不重绘 DOM)
     scaleSlider.oninput = function(e) {
-      let val = parseFloat(e.target.value);
-      val = Math.max(1.0, Math.min(3.0, val)); // 限制范围
-      
-      // 更新所有选中珠子的 scale
-      selectedSet.forEach(i => {
-        if(beads[i]) beads[i].scale = val;
+      let val = Math.max(1.0, Math.min(3.0, parseFloat(e.target.value)));
+      selectedSet.forEach(i => { if(beads[i]) beads[i].scale = val; });
+      selectedPathBeads.forEach(key => {
+        const [pid, bidx] = key.split('_');
+        const p = paths.find(x => x.id === pid);
+        if (p && p.beads[bidx]) p.beads[bidx].scale = val;
       });
-      
-      // 实时更新右侧输入框显示的直径值
       const baseSize = getBaseSize();
-      if (baseSize > 0) {
-        sizeInput.value = (baseSize * val).toFixed(1);
-      }
-      
-      render(); // 重绘 Canvas
+      if (baseSize > 0) sizeInput.value = (baseSize * val).toFixed(1);
+      render();
     };
 
-    // 3. 输入框修改逻辑 (反向计算 scale 并更新滑块)
     sizeInput.onchange = function(e) {
       let targetSize = parseFloat(e.target.value);
       const baseSize = getBaseSize();
-      
       if (baseSize > 0 && !isNaN(targetSize)) {
-        // 计算新的 scale
-        let newScale = targetSize / baseSize;
-        
-        // 限制 scale 范围 1.0 - 3.0
-        newScale = Math.max(1.0, Math.min(3.0, newScale));
-        
-        // 更新数据
-        selectedSet.forEach(i => {
-          if(beads[i]) beads[i].scale = newScale;
+        let newScale = Math.max(1.0, Math.min(3.0, targetSize / baseSize));
+        selectedSet.forEach(i => { if(beads[i]) beads[i].scale = newScale; });
+        selectedPathBeads.forEach(key => {
+          const [pid, bidx] = key.split('_');
+          const p = paths.find(x => x.id === pid);
+          if (p && p.beads[bidx]) p.beads[bidx].scale = newScale;
         });
-        
-        // 同步更新滑块位置
         scaleSlider.value = newScale;
-        
-        // 修正输入框显示值（防止用户输入超出范围的值）
         e.target.value = (baseSize * newScale).toFixed(1);
-        
         render();
       }
     };
     
-    // 旋转逻辑保持不变
     const syncRot = (val) => {
       val = Math.max(-180, Math.min(180, parseInt(val)));
       if (isNaN(val)) val = 0;
-      rotSlider.value = val;
-      rotInput.value = val;
+      rotSlider.value = val; rotInput.value = val;
       selectedSet.forEach(i => { if(beads[i]) beads[i].rotation = val; });
+      selectedPathBeads.forEach(key => {
+        const [pid, bidx] = key.split('_');
+        const p = paths.find(x => x.id === pid);
+        if (p && p.beads[bidx]) p.beads[bidx].rotation = val;
+      });
       render();
     };
-    
     rotSlider.oninput = e => syncRot(e.target.value);
     rotInput.onchange = e => syncRot(e.target.value);
   }
 }
 
-/* ========= 操作按钮 ========= */
 function clearBracelet() {
-  if (beads.length === 0) return;
-  if (confirm('确定清空手串上的所有珠子？')) {
-    // 恢复所有珠子的库存
-    beads.forEach(b => {
-      const m = materials.find(x => x.id === b.materialId);
-      if (m) m.stock = (m.stock || 0) + 1;
-    });
-    
-    beads = []; 
-    selectedSet.clear(); 
-    lastSelectedIdx = -1;
-    updateAdjustPanel(); 
-    renderMaterials(); // 更新素材列表
-    render(); 
+  if (beads.length === 0 && paths.length === 0) return;
+  if (confirm('确定清空所有内容？')) {
+    beads.forEach(b => { const m = materials.find(x => x.id === b.materialId); if (m) m.stock = (m.stock || 0) + 1; });
+    paths.forEach(p => { p.beads.forEach(b => { const m = materials.find(x => x.id === b.materialId); if (m) m.stock = (m.stock || 0) + 1; }); });
+    beads = []; paths = [];
+    selectedPathId = null; selectedSet.clear(); selectedPathBeads.clear();
+    lastSelectedIdx = -1; lastSelectedPathBead = null;
+    updateAdjustPanel(); renderPathList(); updatePathEditControls(); renderMaterials(); render();
   }
 }
 
 function exportImage() {
-  const tempSet = new Set(selectedSet);
-  selectedSet.clear();
+  // 导出时需要重置视图，否则只导出当前视野
+  const tempScale = viewScale;
+  const tempOffX = viewOffsetX;
+  const tempOffY = viewOffsetY;
+  
+  resetView();
   render();
+  
   const link = document.createElement('a');
   link.download = `手串设计_${ts()}.png`;
   link.href = cv.toDataURL('image/png');
   link.click();
-  selectedSet = tempSet;
+  
+  // 恢复视图
+  viewScale = tempScale;
+  viewOffsetX = tempOffX;
+  viewOffsetY = tempOffY;
   render();
 }
 
-/* ========= 方案管理 ========= */
 function savePlan() {
   const name = document.getElementById('planNameInput').value.trim();
   if (!name) { alert('请输入方案名称'); return; }
-  if (beads.length === 0) { alert('手串为空，无法保存'); return; }
+  if (beads.length === 0 && paths.length === 0) { alert('内容为空，无法保存'); return; }
   const data = {
     beads: beads,
+    paths: paths,
     materials: materials.map(m => ({ id:m.id, name:m.name, color:m.color, size:m.size, price:m.price, wuxing:m.wuxing, remark: m.remark || '', stock: m.stock || 0, img: m.img && m.img.src ? m.img.src : null }))
   };
   plans.unshift({ id: newPlanId(), name: name, time: ts(), data: data });
@@ -1358,23 +1938,13 @@ function savePlan() {
 
 function loadPlan(id) {
   const plan = plans.find(p => p.id === id); if (!plan) return;
-  if (!confirm(`加载方案"${plan.name}"？当前手串将被覆盖`)) return;
-  
-  // 先恢复当前画布上珠子的库存
-  beads.forEach(b => {
-    const m = materials.find(x => x.id === b.materialId);
-    if (m) m.stock = (m.stock || 0) + 1;
-  });
-  
+  if (!confirm(`加载方案"${plan.name}"？当前内容将被覆盖`)) return;
+  beads.forEach(b => { const m = materials.find(x => x.id === b.materialId); if (m) m.stock = (m.stock || 0) + 1; });
+  paths.forEach(p => { p.beads.forEach(b => { const m = materials.find(x => x.id === b.materialId); if (m) m.stock = (m.stock || 0) + 1; }); });
   const d = plan.data;
-  beads = d.beads || [];
-  
-  // 扣减加载方案中珠子的库存
-  beads.forEach(b => {
-    const m = materials.find(x => x.id === b.materialId);
-    if (m) m.stock = Math.max(0, (m.stock || 0) - 1);
-  });
-  
+  beads = d.beads || []; paths = d.paths || [];
+  beads.forEach(b => { const m = materials.find(x => x.id === b.materialId); if (m) m.stock = Math.max(0, (m.stock || 0) - 1); });
+  paths.forEach(p => { p.beads.forEach(b => { const m = materials.find(x => x.id === b.materialId); if (m) m.stock = Math.max(0, (m.stock || 0) - 1); }); });
   if (d.materials) {
     d.materials.forEach(m => {
       if (!materials.find(x => x.id === m.id)) {
@@ -1382,14 +1952,11 @@ function loadPlan(id) {
         materials.push(Object.assign({img, remark: m.remark || '', stock: m.stock || 0}, m));
       }
     });
-    renderTags();
-    renderMaterials();
+    renderTags(); renderMaterials();
   }
-  selectedSet.clear();
-  lastSelectedIdx = -1;
-  updateAdjustPanel(); 
-  renderMaterials();
-  render();
+  selectedSet.clear(); selectedPathBeads.clear();
+  lastSelectedIdx = -1; lastSelectedPathBead = null; selectedPathId = null;
+  updateAdjustPanel(); renderPathList(); updatePathEditControls(); renderMaterials(); render();
 }
 
 function deletePlan(id) {
@@ -1417,14 +1984,9 @@ function importPlansFile(e) {
       if (!Array.isArray(importedPlans)) throw new Error('格式错误：应为方案数组');
       let count = 0;
       importedPlans.forEach(p => {
-        if (p.data) {
-            const newPlan = { id: newPlanId(), name: p.name + '_导入', time: ts(), data: p.data };
-            plans.push(newPlan);
-            count++;
-        }
+        if (p.data) { plans.push({ id: newPlanId(), name: p.name + '_导入', time: ts(), data: p.data }); count++; }
       });
-      renderPlans();
-      alert(`成功导入 ${count} 个方案`);
+      renderPlans(); alert(`成功导入 ${count} 个方案`);
     } catch (err) { alert('导入失败：' + err.message); }
   };
   r.readAsText(f); e.target.value = '';
@@ -1446,47 +2008,32 @@ function renderPlans() {
   `).join('');
 }
 
-/* ========= 素材管理 ========= */
 function renderMaterials() {
   const list = document.getElementById('matList');
   const query = document.getElementById('matSearch').value;
   list.innerHTML = '';
-  
   let filtered = materials;
-  
   if (activeTagId !== 'all') {
     const tag = customTags.find(t => t.id === activeTagId);
-    if (tag) {
-      filtered = filtered.filter(m => matchTagRules(m, tag));
-    }
+    if (tag) filtered = filtered.filter(m => matchTagRules(m, tag));
   }
-  
   filtered = filtered.filter(m => matchMaterial(m, query));
-  
   if (filtered.length === 0) {
     list.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#99a;font-size:12px;padding:20px">暂无匹配素材</div>';
     return;
   }
-  
   filtered.forEach(m => {
     const stock = m.stock || 0;
     const isOutOfStock = stock <= 0;
-    
     const div = document.createElement('div');
     div.className = 'mat-item' + (isOutOfStock ? ' out-of-stock' : '');
-    
     div.innerHTML = `
-      <!-- 👇 新增：右上角库存角标 -->
       <div class="mat-stock-badge">${stock}</div>
-      
       <div class="mat-wx wx-${m.wuxing}">${m.wuxing}</div>
       <div class="mat-del-btn" data-id="${m.id}">×</div>
-      
       <div class="mat-thumb" style="background:radial-gradient(circle at 30% 30%, ${lighten(m.color,40)}, ${m.color} 55%, ${darken(m.color,25)})"></div>
-      
       <div class="mat-name">${m.name}</div> 
       <div class="mat-meta">${m.size}mm · ¥${m.price}</div>
-      
       <div class="mat-edit-btn" data-id="${m.id}">编辑</div>
     `;
     list.appendChild(div);
@@ -1498,58 +2045,37 @@ document.getElementById('matList').addEventListener('click', function(e) {
   if (delBtn) {
     e.stopPropagation();
     const id = delBtn.dataset.id;
-    if (confirm('删除该素材？')) {
-      materials = materials.filter(x => x.id !== id);
-      renderTags();
-      renderMaterials();
-      render();
-    }
+    if (confirm('删除该素材？')) { materials = materials.filter(x => x.id !== id); renderTags(); renderMaterials(); render(); }
     return;
   }
-  
   const editBtn = e.target.closest('.mat-edit-btn');
-  if (editBtn) {
-    e.stopPropagation();
-    openEdit(editBtn.dataset.id);
-    return;
-  }
-  
+  if (editBtn) { e.stopPropagation(); openEdit(editBtn.dataset.id); return; }
   const item = e.target.closest('.mat-item');
   if (item) {
-    if (item.classList.contains('out-of-stock')) {
-      alert('该素材库存不足，无法添加');
-      return;
-    }
+    if (item.classList.contains('out-of-stock')) { alert('该素材库存不足，无法添加'); return; }
     const id = item.querySelector('.mat-del-btn').dataset.id;
     addBead(id);
   }
 });
 
-document.getElementById('matSearch').addEventListener('input', function() {
-  renderMaterials();
-});
+document.getElementById('matSearch').addEventListener('input', function() { renderMaterials(); });
 
 function addBead(materialId) {
   const m = materials.find(x => x.id === materialId); 
   if (!m) return;
-  
-  // 检查库存
-  if ((m.stock || 0) <= 0) {
-    alert('该素材库存不足，无法添加');
-    return;
-  }
-  
-  // 扣减库存
+  if ((m.stock || 0) <= 0) { alert('该素材库存不足，无法添加'); return; }
   m.stock = (m.stock || 0) - 1;
-  
-  beads.push({ materialId, scale: 1, rotation: 0 });
-  const newIdx = beads.length - 1;
-  selectedSet.clear();
-  selectedSet.add(newIdx);
-  lastSelectedIdx = newIdx;
-  updateAdjustPanel(); 
-  renderMaterials(); // 更新素材列表显示库存变化
-  render();
+  if (selectedPathId) {
+      const path = paths.find(p => p.id === selectedPathId);
+      if (path) path.beads.push({ materialId, scale: 1, rotation: 0 });
+  } else {
+      beads.push({ materialId, scale: 1, rotation: 0 });
+      const newIdx = beads.length - 1;
+      selectedSet.clear(); selectedSet.add(newIdx);
+      lastSelectedIdx = newIdx;
+      updateAdjustPanel();
+  }
+  renderMaterials(); render();
 }
 
 function addQuickBead() {
@@ -1558,8 +2084,7 @@ function addQuickBead() {
   const wx = ['水','火','木','土','金'];
   const i = materials.length % colors.length;
   materials.push({ id: newId(), name: names[i]+'_'+(materials.length+1), color: colors[i], size: 20, price: (10+Math.random()*40).toFixed(1)*1, wuxing: wx[i], img: new Image(), remark: '', stock: 99 });
-  renderTags();
-  renderMaterials();
+  renderTags(); renderMaterials();
 }
 
 function uploadImages(e) {
@@ -1575,9 +2100,7 @@ function uploadImages(e) {
           const tctx = tc.getContext('2d'); tctx.drawImage(img, 0, 0, 1, 1);
           const [r,g,b] = tctx.getImageData(0,0,1,1).data; m.color = rgbToHex(r,g,b);
         } catch(err){}
-        materials.push(m); 
-        renderTags();
-        renderMaterials();
+        materials.push(m); renderTags(); renderMaterials();
       };
       img.src = ev.target.result;
     };
@@ -1586,7 +2109,6 @@ function uploadImages(e) {
   e.target.value = '';
 }
 
-/* ========= 编辑模态框 ========= */
 function openEdit(id) {
   editingMatId = id;
   const m = materials.find(x => x.id === id); if (!m) return;
@@ -1611,13 +2133,9 @@ function saveModal() {
   m.stock = parseInt(document.getElementById('f_stock').value) || 0;
   m.wuxing = document.getElementById('f_wuxing').value;
   m.remark = document.getElementById('f_remark').value;
-  closeModal(); 
-  renderTags();
-  renderMaterials(); 
-  render();
+  closeModal(); renderTags(); renderMaterials(); render();
 }
 
-/* ========= 素材导入/导出 ========= */
 function exportMaterials() {
   const data = materials.map(m => ({ id:m.id,name:m.name,color:m.color,size:m.size,price:m.price,wuxing:m.wuxing, remark: m.remark || '', stock: m.stock || 0, img: m.img && m.img.src ? m.img.src : null }));
   downloadJSON(data, `素材库_${ts()}.json`);
@@ -1634,16 +2152,12 @@ function importMaterials(e) {
         const img = new Image(); if (m.img) img.src = m.img;
         materials.push({ id: m.id || newId(), name: m.name||'未命名', color: m.color||'#a0d2eb', size: m.size||20, price: m.price||0, wuxing: m.wuxing||'土', remark: m.remark || '', stock: m.stock || 99, img });
       });
-      renderTags();
-      renderMaterials(); 
-      render(); 
-      alert(`成功导入 ${arr.length} 个素材`);
+      renderTags(); renderMaterials(); render(); alert(`成功导入 ${arr.length} 个素材`);
     } catch (err) { alert('导入失败：' + err.message); }
   };
   r.readAsText(f); e.target.value = '';
 }
 
-/* ========= 工具 ========= */
 function ts() {
   const d = new Date();
   return `${d.getFullYear()}${(d.getMonth()+1+'').padStart(2,'0')}${(d.getDate()+'').padStart(2,'0')}_${(d.getHours()+'').padStart(2,'0')}${(d.getMinutes()+'').padStart(2,'0')}${(d.getSeconds()+'').padStart(2,'0')}`;
@@ -1656,7 +2170,6 @@ function downloadJSON(data, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/* ========= 初始化 ========= */
 (function init() {
   const samples = [
     { name:'粉晶',   color:'#f2b5c3', size:20, price:25, wuxing:'火', stock:99 },
@@ -1666,11 +2179,7 @@ function downloadJSON(data, filename) {
     { name:'海蓝宝_8mm', color:'#6fb8d9', size:8, price:38, wuxing:'水', stock:99 },
   ];
   samples.forEach(s => { materials.push({ id:newId(), name:s.name, color:s.color, size:s.size, price:s.price, wuxing:s.wuxing, img:new Image(), remark:'', stock:s.stock }); });
-  
-  renderTags();
-  renderMaterials(); 
-  renderPlans(); 
-  render();
+  renderTags(); renderMaterials(); renderPlans(); render();
 })();
 </script>
 </body>
