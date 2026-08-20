@@ -403,6 +403,14 @@
     border-radius: 4px; cursor: pointer; opacity: 0; transition: opacity .2s;
   }
   .mat-item:hover .mat-edit-btn { opacity: 1; }
+
+  /* 新增：复制按钮样式 */
+  .mat-copy-btn {
+    position: absolute; bottom: 4px; left: 4px;
+    font-size: 9px; padding: 1px 4px; background: #e6a157; color: #fff;
+    border-radius: 4px; cursor: pointer; opacity: 0; transition: opacity .2s;
+  }
+  .mat-item:hover .mat-copy-btn { opacity: 1; }
   
   .mat-del-btn {
     position: absolute; top: 4px; left: 4px;
@@ -520,7 +528,7 @@
 <body>
 
 <div class="app-header">
-  <h1>🔮 黑凤梨手串工具V2.0 (支持缩放/平移)</h1>
+  <h1>🔮 黑凤梨手串工具V1.0</h1>
   <p>提示：滚轮缩放，按住空格+拖拽 或 中键拖拽可移动画布</p>
 </div>
 
@@ -2034,6 +2042,7 @@ function renderMaterials() {
       <div class="mat-thumb" style="background:radial-gradient(circle at 30% 30%, ${lighten(m.color,40)}, ${m.color} 55%, ${darken(m.color,25)})"></div>
       <div class="mat-name">${m.name}</div> 
       <div class="mat-meta">${m.size}mm · ¥${m.price}</div>
+      <div class="mat-copy-btn" data-copy-id="${m.id}">复制</div>
       <div class="mat-edit-btn" data-id="${m.id}">编辑</div>
     `;
     list.appendChild(div);
@@ -2048,6 +2057,16 @@ document.getElementById('matList').addEventListener('click', function(e) {
     if (confirm('删除该素材？')) { materials = materials.filter(x => x.id !== id); renderTags(); renderMaterials(); render(); }
     return;
   }
+
+  // 新增：复制按钮点击事件
+  const copyBtn = e.target.closest('.mat-copy-btn');
+  if (copyBtn) {
+    e.stopPropagation();
+    const id = copyBtn.dataset.copyId;
+    copyMaterial(id);
+    return;
+  }
+
   const editBtn = e.target.closest('.mat-edit-btn');
   if (editBtn) { e.stopPropagation(); openEdit(editBtn.dataset.id); return; }
   const item = e.target.closest('.mat-item');
@@ -2057,6 +2076,29 @@ document.getElementById('matList').addEventListener('click', function(e) {
     addBead(id);
   }
 });
+
+// 新增：复制素材逻辑
+function copyMaterial(id) {
+  const original = materials.find(m => m.id === id);
+  if (!original) return;
+  
+  // 创建副本，保留所有属性
+  const newMat = {
+    id: newId(),
+    name: original.name + '_副本',
+    color: original.color,
+    size: original.size,
+    price: original.price,
+    wuxing: original.wuxing,
+    remark: original.remark || '',
+    stock: original.stock || 0,
+    img: original.img // 引用同一个图片对象
+  };
+  
+  materials.push(newMat);
+  renderTags();
+  renderMaterials();
+}
 
 document.getElementById('matSearch').addEventListener('input', function() { renderMaterials(); });
 
