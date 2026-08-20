@@ -37,7 +37,6 @@
     padding: 14px;
   }
 
-  /* 顶部操作栏 + 画布设置合并 */
   .canvas-settings {
     margin-bottom: 10px;
     padding: 8px 12px;
@@ -83,92 +82,32 @@
   }
   canvas#cv.dragging { cursor: grabbing; }
 
-  /* 选中珠子信息展示区 */
-  .selected-bead-info {
-    margin-top: 10px;
-    padding: 10px 12px;
-    background: #f7fbfd;
-    border-radius: 8px;
-    border: 1px solid #e3edf3;
-    min-height: 50px;
-  }
-  .selected-bead-info.empty {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #99a;
-    font-size: 12px;
-  }
-  .selected-bead-info.has-selection {
-    display: block;
-  }
-  .bead-info-header {
-    font-size: 12px;
-    color: #2c5f7c;
-    font-weight: 600;
-    margin-bottom: 6px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .bead-info-count {
-    font-size: 11px;
-    color: #99a;
-    font-weight: normal;
-  }
-  .bead-info-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 8px;
-  }
-  .bead-info-item {
-    background: #fff;
-    border: 1px solid #e3edf3;
-    border-radius: 6px;
+  /* 选中珠子简洁文字展示区 */
+  .selected-bead-text {
+    margin-top: 8px;
     padding: 8px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    background: #f9f9f9;
+    border-radius: 6px;
+    font-size: 14px;
+    color: #333;
+    text-align: left;
+    min-height: 30px;
+    line-height: 1.5;
   }
-  .bead-info-thumb {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    box-shadow: inset 0 0 3px rgba(0,0,0,0.1);
+  .selected-bead-text.empty {
+    color: #99a;
+    font-size: 12px;
   }
-  .bead-info-details {
-    flex: 1;
-    min-width: 0;
-  }
-  .bead-info-name {
-    font-size: 11px;
+  .selected-bead-text .bead-tag {
+    display: inline-block;
+    background: #eaf4fb;
+    border: 1px solid #d5e3ec;
+    border-radius: 4px;
+    padding: 2px 8px;
+    margin: 2px 4px 2px 0;
+    font-size: 13px;
     color: #2c5f7c;
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
-  .bead-info-attrs {
-    font-size: 10px;
-    color: #667;
-    margin-top: 2px;
-    line-height: 1.4;
-  }
-  .bead-info-attr {
-    display: inline-block;
-    margin-right: 6px;
-  }
-  .bead-info-wx {
-    display: inline-block;
-    font-size: 9px;
-    padding: 1px 4px;
-    border-radius: 3px;
-    color: #fff;
-    margin-left: 4px;
-  }
-  .wx-金{background:#94a3b8;} .wx-木{background:#22c55e;} .wx-水{background:#3b82f6;}
-  .wx-火{background:#ef4444;} .wx-土{background:#eab308;}
 
   .stats-bar {
     display: flex;
@@ -230,12 +169,12 @@
   .btn-warn { background: #e6a157; }
   .btn-danger { background: #d96b6b; }
   .btn-ghost { background: #eef3f7; color: #2c5f7c; border: 1px solid #d5e3ec; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
 
   .no-select-tip {
     font-size: 11px; color: #99a; text-align: center; padding: 18px 0;
   }
 
-  /* 素材库内部布局 */
   .mat-header {
     display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
   }
@@ -248,7 +187,6 @@
     gap: 12px;
   }
   
-  /* 左侧标签栏 - 无圆角瀑布流 */
   .mat-tags {
     width: 110px;
     display: flex;
@@ -408,6 +346,15 @@
     box-shadow: 0 4px 12px rgba(0,0,0,0.08);
     transform: translateY(-2px);
   }
+  .mat-item.out-of-stock {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .mat-item.out-of-stock:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: #e0e0e0;
+  }
   .mat-thumb {
     width: 40px; height: 40px; border-radius: 50%;
     background: #eee;
@@ -420,6 +367,27 @@
     font-weight: 500;
   }
   .mat-meta { font-size: 9px; color: #889; margin-top: 2px; }
+  
+  /* 新增：右上角库存角标样式 */
+  .mat-stock-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background-color: #5cb88a; /* 绿色背景 */
+    color: #fff;               /* 白色文字 */
+    font-size: 10px;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 10px;       /* 圆角矩形 */
+    z-index: 2;                /* 确保在最上层 */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    pointer-events: none;      /* 让鼠标点击穿透，不影响点击卡片 */
+  }
+
+  /* 如果库存为0，可以换个颜色（可选） */
+  .mat-item.out-of-stock .mat-stock-badge {
+    background-color: #d96b6b; /* 红色背景 */
+  }
 
   .mat-wx {
     position: absolute; top: 4px; right: 4px;
@@ -500,13 +468,11 @@
 
 <div class="app-header">
   <h1>🔮 水晶手串 DIY 工具</h1>
-  <p>独立尺寸调整 · 间隙严格锁定2px · 动态周长计算 · 拖拽排序/删除 · 自定义画布 · 自定义标签筛选</p>
+  <p>独立尺寸调整 · 动态周长计算 · 拖拽排序/删除 · 自定义画布 · 自定义标签筛选</p>
 </div>
 
 <div class="main-wrap">
-  <!-- 左栏：画布设置+操作栏 + 画布 -->
   <div class="left-col">
-    <!-- 画布卡片 -->
     <div class="card">
       <div class="canvas-settings">
         <div class="ctrl-row">
@@ -530,23 +496,20 @@
         <canvas id="cv" width="600" height="600"></canvas>
       </div>
       
-      <!-- 选中珠子信息展示区 -->
-      <div class="selected-bead-info empty" id="selectedBeadInfo">
-        点击画布上的珠子查看详细信息
+      <!-- 选中珠子简洁文字展示区 -->
+      <div class="selected-bead-text empty" id="selectedBeadText">
+        点击画布上的珠子查看所选信息
       </div>
       
       <div class="stats-bar">
         <div>珠子数量：<b id="statCount">0</b></div>
-        <div>固定间隙：<b id="statGap">2</b> px</div>
         <div>预估周长：<b id="statLen">0</b> mm</div>
         <div>预估总价：<b id="statPrice">0.0</b> 元</div>
       </div>
     </div>
   </div>
 
-  <!-- 右栏：素材库 + 调整面板 + 方案库 -->
   <div class="right-col">
-    <!-- 素材库卡片 -->
     <div class="card mat-card">
       <div class="mat-header">
         <h3>💎 素材库</h3>
@@ -558,10 +521,8 @@
       </div>
       
       <div class="mat-body">
-        <!-- 左侧标签栏 -->
         <div class="mat-tags" id="matTags"></div>
         
-        <!-- 右侧内容区 -->
         <div class="mat-content">
           <div class="mat-search-wrap">
             <input type="text" id="matSearch" placeholder="搜索名称、尺寸、颜色、价格...">
@@ -577,7 +538,6 @@
       </div>
     </div>
 
-    <!-- 选中珠子调整卡片 -->
     <div class="card adjust-card">
       <div class="ctrl-section">
         <h4>选中珠子调整</h4>
@@ -587,7 +547,6 @@
       </div>
     </div>
 
-    <!-- 方案库卡片 -->
     <div class="card plan-section">
       <div class="plan-header">
         <h3>📋 方案库</h3>
@@ -614,6 +573,7 @@
     <div class="field"><label>颜色</label><input id="f_color" type="color"></div>
     <div class="field"><label>尺寸 (mm)</label><input id="f_size" type="number" min="5" max="100" step="1"></div>
     <div class="field"><label>价格 (元)</label><input id="f_price" type="number" min="0" step="0.1"></div>
+    <div class="field"><label>数量 (颗)</label><input id="f_stock" type="number" min="0" step="1" placeholder="输入库存数量"></div>
     <div class="field"><label>五行</label>
       <select id="f_wuxing">
         <option value="金">金</option><option value="木">木</option>
@@ -681,11 +641,10 @@ const newId = () => 'm' + (idCounter++);
 
 const FIXED_GAP_PX = 2;
 
-// 自定义标签系统
-let customTags = []; // {id, name, rules: {name, size, price, wuxing}}
+let customTags = [];
 let tagIdCounter = 1;
 const newTagId = () => 't' + (tagIdCounter++);
-let activeTagId = 'all'; // 默认选中"全部"
+let activeTagId = 'all';
 
 let plans = [];
 let planIdCounter = 1;
@@ -950,7 +909,7 @@ function render() {
     ctx.textAlign = 'center';
     ctx.fillText('点击右侧素材添加珠子', CX, CY);
     updateStats();
-    updateSelectedBeadInfo();
+    updateSelectedBeadText();
     return;
   }
 
@@ -992,7 +951,7 @@ function render() {
   }
 
   updateStats();
-  updateSelectedBeadInfo();
+  updateSelectedBeadText();
 }
 
 function drawBead(b, x, y, selected, viewScale = 1) {
@@ -1064,27 +1023,21 @@ function updateStats() {
   
   document.getElementById('statLen').innerText = Math.round(totalLen);
   document.getElementById('statPrice').innerText = totalPrice.toFixed(1);
-  document.getElementById('statGap').innerText = FIXED_GAP_PX;
 }
 
-/* ========= 选中珠子信息展示 ========= */
-function updateSelectedBeadInfo() {
-  const container = document.getElementById('selectedBeadInfo');
+/* ========= 选中珠子简洁文字展示 ========= */
+function updateSelectedBeadText() {
+  const container = document.getElementById('selectedBeadText');
   
   if (selectedSet.size === 0) {
-    container.className = 'selected-bead-info empty';
-    container.innerHTML = '点击画布上的珠子查看详细信息';
+    container.className = 'selected-bead-text empty';
+    container.innerHTML = '点击画布上的珠子查看所选信息';
     return;
   }
   
-  container.className = 'selected-bead-info has-selection';
+  container.className = 'selected-bead-text';
   
-  let html = `<div class="bead-info-header">
-    <span>已选中珠子</span>
-    <span class="bead-info-count">${selectedSet.size} 颗</span>
-  </div>`;
-  
-  html += '<div class="bead-info-grid">';
+  let html = '<span style="color:#667;font-size:12px;margin-right:8px;">已选中 ' + selectedSet.size + ' 颗：</span>';
   
   selectedSet.forEach(idx => {
     const bead = beads[idx];
@@ -1093,25 +1046,9 @@ function updateSelectedBeadInfo() {
     const m = materials.find(x => x.id === bead.materialId);
     if (!m) return;
     
-    const actualSize = (m.size || 0) * bead.scale;
-    const gradientStyle = `radial-gradient(circle at 30% 30%, ${lighten(m.color, 40)}, ${m.color} 55%, ${darken(m.color, 25)})`;
-    
-    html += `
-      <div class="bead-info-item">
-        <div class="bead-info-thumb" style="background: ${gradientStyle}"></div>
-        <div class="bead-info-details">
-          <div class="bead-info-name">${m.name}</div>
-          <div class="bead-info-attrs">
-            <span class="bead-info-attr">尺寸: ${actualSize.toFixed(1)}mm</span>
-            <span class="bead-info-attr">价格: ¥${m.price}</span>
-            <span class="bead-info-wx wx-${m.wuxing}">${m.wuxing}</span>
-          </div>
-        </div>
-      </div>
-    `;
+    html += `<span class="bead-tag">${m.name}</span>`;
   });
   
-  html += '</div>';
   container.innerHTML = html;
 }
 
@@ -1184,6 +1121,11 @@ cv.addEventListener('mouseup', e => {
                       p.y >= DEL_ZONE_Y && p.y <= DEL_ZONE_Y + DEL_ZONE_H;
   
   if (isInDelZone) {
+    // 删除珠子，恢复库存
+    const deletedBead = beads[draggingIdx];
+    const m = materials.find(x => x.id === deletedBead.materialId);
+    if (m) m.stock = (m.stock || 0) + 1;
+    
     beads.splice(draggingIdx, 1);
     const newSet = new Set();
     selectedSet.forEach(i => {
@@ -1192,6 +1134,8 @@ cv.addEventListener('mouseup', e => {
     });
     selectedSet = newSet;
     lastSelectedIdx = -1;
+    
+    renderMaterials(); // 更新素材列表显示
   } else {
     const layout = computeLayout();
     const dx = p.x - CX, dy = p.y - CY;
@@ -1248,7 +1192,7 @@ cv.addEventListener('mouseleave', () => {
   }
 });
 
-/* ========= 珠子调整面板 ========= */
+/* ========= 珠子调整面板 (优化版：滑块流畅 + 直径可编辑) ========= */
 function updateAdjustPanel() {
   const body = document.getElementById('adjustBody');
   let html = '';
@@ -1258,6 +1202,7 @@ function updateAdjustPanel() {
     html += `<div class="no-select-tip">点击画布上的珠子以选中（按住 Shift/Ctrl 可多选）</div>`;
   } else {
     let initScale = 1, initRot = 0, currentSize = 0;
+    // 获取最后一个选中珠子的基础信息
     if (lastSelectedIdx >= 0 && beads[lastSelectedIdx]) {
       initScale = beads[lastSelectedIdx].scale;
       initRot = beads[lastSelectedIdx].rotation;
@@ -1265,16 +1210,20 @@ function updateAdjustPanel() {
       if (m) currentSize = (m.size || 0) * initScale;
     }
     
-    html += `<div style="font-size:11px; color:#2c5f7c; margin-bottom:8px; font-weight:600;">已选中 ${count} 颗珠子</div>`;
-    html += `<div class="ctrl-row"><label>当前直径</label><span class="val" id="curSizeVal" style="width:auto; flex:1; text-align:left; font-size:13px; color:#d96b6b;">${currentSize.toFixed(1)} mm</span></div>`;
-    
+    // 1. 尺寸缩放行：右侧改为可编辑的输入框，显示直径
     html += `
       <div class="ctrl-row">
         <label>尺寸缩放</label>
         <input type="range" id="sScale" min="1.0" max="3.0" step="0.05" value="${initScale}">
-        <input type="number" class="ctrl-input" id="iScale" min="1.0" max="3.0" step="0.05" value="${initScale.toFixed(2)}">
+        <!-- 这里是一个普通的数字输入框，用于显示和修改直径 -->
+        <input type="number" class="ctrl-input" id="iSizeDisplay" 
+               value="${currentSize.toFixed(1)}" 
+               style="width:70px; text-align:right;" 
+               title="输入目标直径(mm)">
+        <span style="font-size:11px; color:#99a; width:20px;">mm</span>
       </div>`;
     
+    // 旋转角度行保持不变
     html += `
       <div class="ctrl-row">
         <label>旋转角度</label>
@@ -1287,47 +1236,74 @@ function updateAdjustPanel() {
   
   if (count > 0) {
     const scaleSlider = document.getElementById('sScale');
+    const sizeInput = document.getElementById('iSizeDisplay'); // 新的直径输入框
     const rotSlider = document.getElementById('sRot');
-    const scaleInput = document.getElementById('iScale');
     const rotInput = document.getElementById('iRot');
     
-    const syncScale = (val) => {
-      val = Math.max(1.0, Math.min(3.0, parseFloat(val)));
-      if (isNaN(val)) val = 1.0;
+    // 辅助函数：获取基础尺寸
+    const getBaseSize = () => {
+      if (lastSelectedIdx >= 0 && beads[lastSelectedIdx]) {
+        const m = materials.find(x => x.id === beads[lastSelectedIdx].materialId);
+        return m ? (m.size || 0) : 0;
+      }
+      return 0;
+    };
+
+    // 2. 滑块拖动逻辑 (只更新数据和输入框显示，不重绘 DOM)
+    scaleSlider.oninput = function(e) {
+      let val = parseFloat(e.target.value);
+      val = Math.max(1.0, Math.min(3.0, val)); // 限制范围
       
-      scaleSlider.value = val;
-      scaleInput.value = val.toFixed(2);
-      
+      // 更新所有选中珠子的 scale
       selectedSet.forEach(i => {
         if(beads[i]) beads[i].scale = val;
       });
       
-      let newSize = 0;
-      if (lastSelectedIdx >= 0 && beads[lastSelectedIdx]) {
-        const m = materials.find(x => x.id === beads[lastSelectedIdx].materialId);
-        if (m) newSize = (m.size || 0) * beads[lastSelectedIdx].scale;
+      // 实时更新右侧输入框显示的直径值
+      const baseSize = getBaseSize();
+      if (baseSize > 0) {
+        sizeInput.value = (baseSize * val).toFixed(1);
       }
-      const sizeDisplay = document.getElementById('curSizeVal');
-      if(sizeDisplay) sizeDisplay.innerText = newSize.toFixed(1) + ' mm';
       
-      render();
+      render(); // 重绘 Canvas
     };
 
+    // 3. 输入框修改逻辑 (反向计算 scale 并更新滑块)
+    sizeInput.onchange = function(e) {
+      let targetSize = parseFloat(e.target.value);
+      const baseSize = getBaseSize();
+      
+      if (baseSize > 0 && !isNaN(targetSize)) {
+        // 计算新的 scale
+        let newScale = targetSize / baseSize;
+        
+        // 限制 scale 范围 1.0 - 3.0
+        newScale = Math.max(1.0, Math.min(3.0, newScale));
+        
+        // 更新数据
+        selectedSet.forEach(i => {
+          if(beads[i]) beads[i].scale = newScale;
+        });
+        
+        // 同步更新滑块位置
+        scaleSlider.value = newScale;
+        
+        // 修正输入框显示值（防止用户输入超出范围的值）
+        e.target.value = (baseSize * newScale).toFixed(1);
+        
+        render();
+      }
+    };
+    
+    // 旋转逻辑保持不变
     const syncRot = (val) => {
       val = Math.max(-180, Math.min(180, parseInt(val)));
       if (isNaN(val)) val = 0;
-      
       rotSlider.value = val;
       rotInput.value = val;
-      
-      selectedSet.forEach(i => {
-        if(beads[i]) beads[i].rotation = val;
-      });
+      selectedSet.forEach(i => { if(beads[i]) beads[i].rotation = val; });
       render();
     };
-    
-    scaleSlider.oninput = e => syncScale(e.target.value);
-    scaleInput.onchange = e => syncScale(e.target.value);
     
     rotSlider.oninput = e => syncRot(e.target.value);
     rotInput.onchange = e => syncRot(e.target.value);
@@ -1337,11 +1313,18 @@ function updateAdjustPanel() {
 /* ========= 操作按钮 ========= */
 function clearBracelet() {
   if (beads.length === 0) return;
-  if (confirm('确定清空手串上的所有珠子？')) { 
+  if (confirm('确定清空手串上的所有珠子？')) {
+    // 恢复所有珠子的库存
+    beads.forEach(b => {
+      const m = materials.find(x => x.id === b.materialId);
+      if (m) m.stock = (m.stock || 0) + 1;
+    });
+    
     beads = []; 
     selectedSet.clear(); 
     lastSelectedIdx = -1;
     updateAdjustPanel(); 
+    renderMaterials(); // 更新素材列表
     render(); 
   }
 }
@@ -1365,7 +1348,7 @@ function savePlan() {
   if (beads.length === 0) { alert('手串为空，无法保存'); return; }
   const data = {
     beads: beads,
-    materials: materials.map(m => ({ id:m.id, name:m.name, color:m.color, size:m.size, price:m.price, wuxing:m.wuxing, remark: m.remark || '', img: m.img && m.img.src ? m.img.src : null }))
+    materials: materials.map(m => ({ id:m.id, name:m.name, color:m.color, size:m.size, price:m.price, wuxing:m.wuxing, remark: m.remark || '', stock: m.stock || 0, img: m.img && m.img.src ? m.img.src : null }))
   };
   plans.unshift({ id: newPlanId(), name: name, time: ts(), data: data });
   renderPlans();
@@ -1376,13 +1359,27 @@ function savePlan() {
 function loadPlan(id) {
   const plan = plans.find(p => p.id === id); if (!plan) return;
   if (!confirm(`加载方案"${plan.name}"？当前手串将被覆盖`)) return;
+  
+  // 先恢复当前画布上珠子的库存
+  beads.forEach(b => {
+    const m = materials.find(x => x.id === b.materialId);
+    if (m) m.stock = (m.stock || 0) + 1;
+  });
+  
   const d = plan.data;
   beads = d.beads || [];
+  
+  // 扣减加载方案中珠子的库存
+  beads.forEach(b => {
+    const m = materials.find(x => x.id === b.materialId);
+    if (m) m.stock = Math.max(0, (m.stock || 0) - 1);
+  });
+  
   if (d.materials) {
     d.materials.forEach(m => {
       if (!materials.find(x => x.id === m.id)) {
         const img = new Image(); if (m.img) img.src = m.img;
-        materials.push(Object.assign({img, remark: m.remark || ''}, m));
+        materials.push(Object.assign({img, remark: m.remark || '', stock: m.stock || 0}, m));
       }
     });
     renderTags();
@@ -1391,6 +1388,7 @@ function loadPlan(id) {
   selectedSet.clear();
   lastSelectedIdx = -1;
   updateAdjustPanel(); 
+  renderMaterials();
   render();
 }
 
@@ -1471,14 +1469,24 @@ function renderMaterials() {
   }
   
   filtered.forEach(m => {
+    const stock = m.stock || 0;
+    const isOutOfStock = stock <= 0;
+    
     const div = document.createElement('div');
-    div.className = 'mat-item';
+    div.className = 'mat-item' + (isOutOfStock ? ' out-of-stock' : '');
+    
     div.innerHTML = `
+      <!-- 👇 新增：右上角库存角标 -->
+      <div class="mat-stock-badge">${stock}</div>
+      
       <div class="mat-wx wx-${m.wuxing}">${m.wuxing}</div>
       <div class="mat-del-btn" data-id="${m.id}">×</div>
+      
       <div class="mat-thumb" style="background:radial-gradient(circle at 30% 30%, ${lighten(m.color,40)}, ${m.color} 55%, ${darken(m.color,25)})"></div>
-      <div class="mat-name">${m.name}</div>
+      
+      <div class="mat-name">${m.name}</div> 
       <div class="mat-meta">${m.size}mm · ¥${m.price}</div>
+      
       <div class="mat-edit-btn" data-id="${m.id}">编辑</div>
     `;
     list.appendChild(div);
@@ -1508,6 +1516,10 @@ document.getElementById('matList').addEventListener('click', function(e) {
   
   const item = e.target.closest('.mat-item');
   if (item) {
+    if (item.classList.contains('out-of-stock')) {
+      alert('该素材库存不足，无法添加');
+      return;
+    }
     const id = item.querySelector('.mat-del-btn').dataset.id;
     addBead(id);
   }
@@ -1518,13 +1530,25 @@ document.getElementById('matSearch').addEventListener('input', function() {
 });
 
 function addBead(materialId) {
-  const m = materials.find(x => x.id === materialId); if (!m) return;
+  const m = materials.find(x => x.id === materialId); 
+  if (!m) return;
+  
+  // 检查库存
+  if ((m.stock || 0) <= 0) {
+    alert('该素材库存不足，无法添加');
+    return;
+  }
+  
+  // 扣减库存
+  m.stock = (m.stock || 0) - 1;
+  
   beads.push({ materialId, scale: 1, rotation: 0 });
   const newIdx = beads.length - 1;
   selectedSet.clear();
   selectedSet.add(newIdx);
   lastSelectedIdx = newIdx;
   updateAdjustPanel(); 
+  renderMaterials(); // 更新素材列表显示库存变化
   render();
 }
 
@@ -1533,7 +1557,7 @@ function addQuickBead() {
   const names = ['海蓝宝','粉晶','绿幽灵','黄水晶','紫水晶'];
   const wx = ['水','火','木','土','金'];
   const i = materials.length % colors.length;
-  materials.push({ id: newId(), name: names[i]+'_'+(materials.length+1), color: colors[i], size: 20, price: (10+Math.random()*40).toFixed(1)*1, wuxing: wx[i], img: new Image(), remark: '' });
+  materials.push({ id: newId(), name: names[i]+'_'+(materials.length+1), color: colors[i], size: 20, price: (10+Math.random()*40).toFixed(1)*1, wuxing: wx[i], img: new Image(), remark: '', stock: 99 });
   renderTags();
   renderMaterials();
 }
@@ -1545,7 +1569,7 @@ function uploadImages(e) {
     r.onload = ev => {
       const img = new Image();
       img.onload = () => {
-        const m = { id: newId(), name: f.name.replace(/\.[^.]+$/,''), color: '#a0d2eb', size: 22, price: 0, wuxing: '土', img, remark: '' };
+        const m = { id: newId(), name: f.name.replace(/\.[^.]+$/,''), color: '#a0d2eb', size: 22, price: 0, wuxing: '土', img, remark: '', stock: 99 };
         try {
           const tc = document.createElement('canvas'); tc.width=1;tc.height=1;
           const tctx = tc.getContext('2d'); tctx.drawImage(img, 0, 0, 1, 1);
@@ -1570,6 +1594,7 @@ function openEdit(id) {
   document.getElementById('f_color').value = m.color;
   document.getElementById('f_size').value = m.size;
   document.getElementById('f_price').value = m.price;
+  document.getElementById('f_stock').value = m.stock || 0;
   document.getElementById('f_wuxing').value = m.wuxing;
   document.getElementById('f_remark').value = m.remark || '';
   document.getElementById('editModal').classList.add('show');
@@ -1583,6 +1608,7 @@ function saveModal() {
   m.color = document.getElementById('f_color').value;
   m.size = parseFloat(document.getElementById('f_size').value) || m.size;
   m.price = parseFloat(document.getElementById('f_price').value) || 0;
+  m.stock = parseInt(document.getElementById('f_stock').value) || 0;
   m.wuxing = document.getElementById('f_wuxing').value;
   m.remark = document.getElementById('f_remark').value;
   closeModal(); 
@@ -1593,7 +1619,7 @@ function saveModal() {
 
 /* ========= 素材导入/导出 ========= */
 function exportMaterials() {
-  const data = materials.map(m => ({ id:m.id,name:m.name,color:m.color,size:m.size,price:m.price,wuxing:m.wuxing, remark: m.remark || '', img: m.img && m.img.src ? m.img.src : null }));
+  const data = materials.map(m => ({ id:m.id,name:m.name,color:m.color,size:m.size,price:m.price,wuxing:m.wuxing, remark: m.remark || '', stock: m.stock || 0, img: m.img && m.img.src ? m.img.src : null }));
   downloadJSON(data, `素材库_${ts()}.json`);
 }
 
@@ -1606,7 +1632,7 @@ function importMaterials(e) {
       if (!Array.isArray(arr)) throw new Error('格式错误');
       arr.forEach(m => {
         const img = new Image(); if (m.img) img.src = m.img;
-        materials.push({ id: m.id || newId(), name: m.name||'未命名', color: m.color||'#a0d2eb', size: m.size||20, price: m.price||0, wuxing: m.wuxing||'土', remark: m.remark || '', img });
+        materials.push({ id: m.id || newId(), name: m.name||'未命名', color: m.color||'#a0d2eb', size: m.size||20, price: m.price||0, wuxing: m.wuxing||'土', remark: m.remark || '', stock: m.stock || 99, img });
       });
       renderTags();
       renderMaterials(); 
@@ -1633,14 +1659,13 @@ function downloadJSON(data, filename) {
 /* ========= 初始化 ========= */
 (function init() {
   const samples = [
-    { name:'海蓝宝', color:'#6fb8d9', size:22, price:38, wuxing:'水' },
-    { name:'粉晶',   color:'#f2b5c3', size:20, price:25, wuxing:'火' },
-    { name:'绿幽灵', color:'#7cc48a', size:24, price:55, wuxing:'木' },
-    { name:'黄水晶', color:'#e8c766', size:22, price:42, wuxing:'土' },
-    { name:'紫水晶', color:'#b59ad6', size:20, price:48, wuxing:'金' },
-    { name:'海蓝宝_8mm', color:'#6fb8d9', size:8, price:38, wuxing:'水' },
+    { name:'粉晶',   color:'#f2b5c3', size:20, price:25, wuxing:'火', stock:99 },
+    { name:'绿幽灵', color:'#7cc48a', size:24, price:55, wuxing:'木', stock:99 },
+    { name:'黄水晶', color:'#e8c766', size:22, price:42, wuxing:'土', stock:99 },
+    { name:'紫水晶', color:'#b59ad6', size:20, price:48, wuxing:'金', stock:99 },
+    { name:'海蓝宝_8mm', color:'#6fb8d9', size:8, price:38, wuxing:'水', stock:99 },
   ];
-  samples.forEach(s => { materials.push({ id:newId(), name:s.name, color:s.color, size:s.size, price:s.price, wuxing:s.wuxing, img:new Image(), remark:'' }); });
+  samples.forEach(s => { materials.push({ id:newId(), name:s.name, color:s.color, size:s.size, price:s.price, wuxing:s.wuxing, img:new Image(), remark:'', stock:s.stock }); });
   
   renderTags();
   renderMaterials(); 
