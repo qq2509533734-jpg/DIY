@@ -80,8 +80,6 @@
     box-shadow: inset 0 0 0 1px #dfe9f0;
     cursor: crosshair;
     touch-action: none;
-    /* 移除 max-width/height 限制，让 canvas 保持原始分辨率，通过 CSS transform 或内部逻辑缩放 */
-    /* 这里我们保持 canvas 尺寸不变，通过 JS 逻辑缩放内容 */
   }
   canvas#cv.dragging { cursor: grabbing; }
   canvas#cv.drawing { cursor: crosshair; }
@@ -528,7 +526,7 @@
 <body>
 
 <div class="app-header">
-  <h1>🔮 黑凤梨手串工具V1.0</h1>
+  <h1>🔮 黑凤梨手串工具V1.1 (新增色系)</h1>
   <p>提示：滚轮缩放，按住空格+拖拽 或 中键拖拽可移动画布</p>
 </div>
 
@@ -660,6 +658,8 @@
         <option value="水">水</option><option value="火">火</option><option value="土">土</option>
       </select>
     </div>
+    <!-- 新增：色系字段 -->
+    <div class="field"><label>色系 (自定义文案)</label><input id="f_series" type="text" placeholder="例如：莫兰迪色系、马卡龙色系"></div>
     <div class="field"><label>备注</label><input id="f_remark" type="text" maxlength="50" placeholder="请输入备注（最多50字符）"></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">取消</button>
@@ -695,6 +695,11 @@
         <option value="金">金</option><option value="木">木</option>
         <option value="水">水</option><option value="火">火</option><option value="土">土</option>
       </select>
+    </div>
+    <!-- 新增：色系匹配 -->
+    <div class="field">
+      <label>匹配色系 (包含)</label>
+      <input id="tag_match_series" type="text" placeholder="素材色系包含此关键词">
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeAddTagModal()">取消</button>
@@ -814,6 +819,7 @@ function zoomOut() {
   render();
 }
 
+// 修改：增加色系匹配逻辑
 function matchTagRules(material, tag) {
   const rules = tag.rules;
   if (rules.name && rules.name.trim()) {
@@ -829,6 +835,12 @@ function matchTagRules(material, tag) {
   }
   if (rules.wuxing && rules.wuxing.trim()) {
     if (material.wuxing !== rules.wuxing.trim()) return false;
+  }
+  // 新增：色系匹配 (模糊匹配)
+  if (rules.series && rules.series.trim()) {
+    const matSeries = (material.series || '').toLowerCase();
+    const ruleSeries = rules.series.trim().toLowerCase();
+    if (!matSeries.includes(ruleSeries)) return false;
   }
   return true;
 }
@@ -892,6 +904,7 @@ function openAddTagModal() {
   document.getElementById('tag_match_size').value = '';
   document.getElementById('tag_match_price').value = '';
   document.getElementById('tag_match_wuxing').value = '';
+  document.getElementById('tag_match_series').value = ''; // 重置色系
   document.getElementById('addTagModal').classList.add('show');
 }
 
@@ -906,14 +919,21 @@ function saveNewTag() {
   const matchSize = document.getElementById('tag_match_size').value;
   const matchPrice = document.getElementById('tag_match_price').value;
   const matchWuxing = document.getElementById('tag_match_wuxing').value;
+  const matchSeries = document.getElementById('tag_match_series').value.trim(); // 获取色系
   
-  if (!matchName && !matchSize && !matchPrice && !matchWuxing) {
+  if (!matchName && !matchSize && !matchPrice && !matchWuxing && !matchSeries) {
     alert('请至少设置一个匹配规则'); return;
   }
   
   customTags.push({
     id: newTagId(), name: name,
-    rules: { name: matchName, size: matchSize ? parseFloat(matchSize) : '', price: matchPrice ? parseFloat(matchPrice) : '', wuxing: matchWuxing }
+    rules: { 
+      name: matchName, 
+      size: matchSize ? parseFloat(matchSize) : '', 
+      price: matchPrice ? parseFloat(matchPrice) : '', 
+      wuxing: matchWuxing,
+      series: matchSeries // 保存色系规则
+    }
   });
   closeAddTagModal();
   renderTags();
@@ -935,7 +955,8 @@ function matchMaterial(m, query) {
     const val = parseFloat(q);
     if (m.price === val) return true;
   }
-  const fields = [m.name, m.size.toString(), m.color, m.remark || '', m.wuxing].map(f => f.toLowerCase());
+  // 增加色系搜索
+  const fields = [m.name, m.size.toString(), m.color, m.remark || '', m.wuxing, m.series || ''].map(f => f.toLowerCase());
   return fields.some(f => f.includes(ql));
 }
 
@@ -1160,58 +1181,50 @@ function render() {
           ctx.setLineDash([]);
       }
       
-      const beadCenters = getPathBeadCenters(path);
-      const count = Math.min(path.beads.length, beadCenters.length);
-      for(let i=0; i<count; i++) {
-          // 跳过正在拖动的路径珠子
-          if (draggingPathBead && draggingPathBead.pathId === path.id && draggingPathBead.beadIdx === i) continue;
+      // 如果正在拖动此路径的珠子，我们需要特殊处理渲染
+      const isDraggingThisPath = draggingPathBead && draggingPathBead.pathId === path.id;
+      
+      if (isDraggingThisPath) {
+          // 实时计算其余珠子的位置（排除被拖动的珠子）
+          const tempBeads = path.beads.filter((_, i) => i !== draggingPathBead.beadIdx);
+          const tempPath = { ...path, beads: tempBeads };
+          const otherCenters = getPathBeadCenters(tempPath);
           
-          const b = path.beads[i];
-          const c = beadCenters[i];
-          const isPathBeadSelected = selectedPathBeads.has(path.id + '_' + i);
-          drawBead(b, c.x, c.y, isPathBeadSelected, 1); 
+          // 绘制其余珠子
+          let otherIdx = 0;
+          for(let i=0; i<path.beads.length; i++) {
+              if (i === draggingPathBead.beadIdx) continue;
+              const b = path.beads[i];
+              const c = otherCenters[otherIdx++];
+              const isPathBeadSelected = selectedPathBeads.has(path.id + '_' + i);
+              drawBead(b, c.x, c.y, isPathBeadSelected, 1); 
+          }
+      } else {
+          // 正常绘制所有珠子
+          const beadCenters = getPathBeadCenters(path);
+          const count = Math.min(path.beads.length, beadCenters.length);
+          for(let i=0; i<count; i++) {
+              const b = path.beads[i];
+              const c = beadCenters[i];
+              const isPathBeadSelected = selectedPathBeads.has(path.id + '_' + i);
+              drawBead(b, c.x, c.y, isPathBeadSelected, 1); 
+          }
       }
+      
       ctx.restore();
   });
-
-  // 新增：绘制正在拖动的路径珠子及删除区域
-  if (draggingPathBead && dragPos) {
-      const path = paths.find(p => p.id === draggingPathBead.pathId);
-      if (path && path.beads[draggingPathBead.beadIdx]) {
-          const b = path.beads[draggingPathBead.beadIdx];
-          // 删除区域也需要应用变换吗？不，删除区域是UI层，应该在变换之外绘制，或者在这里反向计算。
-          // 为了简单，我们在 restore 之后绘制 UI 层。
-      }
-  }
-
-  if (isDrawing && currentPathPoints.length > 0) {
-      ctx.beginPath();
-      ctx.moveTo(currentPathPoints[0].x, currentPathPoints[0].y);
-      for (let i = 1; i < currentPathPoints.length; i++) {
-          ctx.lineTo(currentPathPoints[i].x, currentPathPoints[i].y);
-      }
-      ctx.strokeStyle = '#2c5f7c';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-  }
-
-  if (draggingIdx >= 0 && dragPos) {
-    // 同样，拖动预览在 restore 后绘制更简单，或者在这里绘制但要注意坐标
-  }
 
   ctx.restore(); // 恢复变换，以下绘制 UI 层（删除区等）
 
   // 4. 绘制 UI 层 (删除区域等，不受缩放影响，保持在屏幕固定位置)
-  // 注意：如果希望删除区域也随画布移动，则需要保留在变换内。
-  // 通常删除区域是固定在屏幕右下角的，所以放在 restore 之后。
   
   // 绘制路径珠子拖动预览
   if (draggingPathBead && dragPos) {
       const path = paths.find(p => p.id === draggingPathBead.pathId);
       if (path && path.beads[draggingPathBead.beadIdx]) {
           const b = path.beads[draggingPathBead.beadIdx];
-          const isInDelZone = dragPos.x >= DEL_ZONE_X && dragPos.x <= DEL_ZONE_X + DEL_ZONE_W &&
-                              dragPos.y >= DEL_ZONE_Y && dragPos.y <= DEL_ZONE_Y + DEL_ZONE_H;
+          const isInDelZone = dragPos.screenX >= DEL_ZONE_X && dragPos.screenX <= DEL_ZONE_X + DEL_ZONE_W &&
+                              dragPos.screenY >= DEL_ZONE_Y && dragPos.screenY <= DEL_ZONE_Y + DEL_ZONE_H;
           
           ctx.fillStyle = isInDelZone ? 'rgba(255, 0, 0, 0.7)' : 'rgba(255, 0, 0, 0.4)';
           ctx.fillRect(DEL_ZONE_X, DEL_ZONE_Y, DEL_ZONE_W, DEL_ZONE_H);
@@ -1224,18 +1237,16 @@ function render() {
           ctx.textBaseline = 'middle';
           ctx.fillText(isInDelZone ? '松开删除' : '拖至此处删除', DEL_ZONE_X + DEL_ZONE_W/2, DEL_ZONE_Y + DEL_ZONE_H/2);
 
-          // 注意：这里的 dragPos 是屏幕坐标，drawBead 期望的是世界坐标。
-          // 如果需要珠子跟随鼠标，且鼠标是屏幕坐标，我们需要反向变换，或者让 drawBead 接受屏幕坐标。
-          // 简单起见，我们假设 dragPos 已经是世界坐标（通过 getMouse 转换）。
-          // 但是 getMouse 现在返回的是世界坐标。
+          // 注意：这里的 dragPos 包含 screenX/Y 和 worldX/Y
+          // drawBead 需要世界坐标
           drawBead(b, dragPos.x, dragPos.y, true, 1);
       }
   }
 
   // 绘制圆环珠子拖动预览
   if (draggingIdx >= 0 && dragPos) {
-    const isInDelZone = dragPos.x >= DEL_ZONE_X && dragPos.x <= DEL_ZONE_X + DEL_ZONE_W &&
-                        dragPos.y >= DEL_ZONE_Y && dragPos.y <= DEL_ZONE_Y + DEL_ZONE_H;
+    const isInDelZone = dragPos.screenX >= DEL_ZONE_X && dragPos.screenX <= DEL_ZONE_X + DEL_ZONE_W &&
+                        dragPos.screenY >= DEL_ZONE_Y && dragPos.screenY <= DEL_ZONE_Y + DEL_ZONE_H;
     ctx.fillStyle = isInDelZone ? 'rgba(255, 0, 0, 0.7)' : 'rgba(255, 0, 0, 0.4)';
     ctx.fillRect(DEL_ZONE_X, DEL_ZONE_Y, DEL_ZONE_W, DEL_ZONE_H);
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
@@ -1248,10 +1259,6 @@ function render() {
     ctx.fillText(isInDelZone ? '松开删除' : '拖至此处删除', DEL_ZONE_X + DEL_ZONE_W/2, DEL_ZONE_Y + DEL_ZONE_H/2);
 
     const layout = computeLayout();
-    // dragPos 是世界坐标，但 drawBead 内部没有应用 viewScale，因为它是在 restore 后调用的？
-    // 不，之前的逻辑是 drawBead 在 transform 内调用。
-    // 现在我们将拖动预览放在 restore 后，所以需要手动应用变换，或者重新进入 transform。
-    // 为了保持一致性，我们重新进入 transform 来绘制这个珠子。
     ctx.save();
     ctx.translate(viewOffsetX, viewOffsetY);
     ctx.scale(viewScale, viewScale);
@@ -1447,7 +1454,7 @@ cv.addEventListener('mousedown', e => {
     
     // 新增：开始拖动路径珠子
     draggingPathBead = pathBeadHit;
-    dragPos = { x: p.x, y: p.y }; // 世界坐标
+    dragPos = { x: p.x, y: p.y, screenX: p.screenX, screenY: p.screenY }; // 世界坐标 + 屏幕坐标
     cv.classList.add('dragging');
     
     renderPathList();
@@ -1480,7 +1487,7 @@ cv.addEventListener('mousedown', e => {
       lastSelectedIdx = idx;
     }
     draggingIdx = idx;
-    dragPos = { x: p.x, y: p.y }; // 世界坐标
+    dragPos = { x: p.x, y: p.y, screenX: p.screenX, screenY: p.screenY }; // 世界坐标 + 屏幕坐标
     cv.classList.add('dragging');
     updateAdjustPanel();
     render();
@@ -1521,13 +1528,13 @@ cv.addEventListener('mousemove', e => {
   
   // 新增：拖动路径珠子
   if (draggingPathBead) {
-      dragPos = p; // p 是世界坐标
+      dragPos = { x: p.x, y: p.y, screenX: p.screenX, screenY: p.screenY };
       render();
       return;
   }
   
   if (draggingIdx < 0) return;
-  dragPos = p; // p 是世界坐标
+  dragPos = { x: p.x, y: p.y, screenX: p.screenX, screenY: p.screenY };
   render();
 });
 
@@ -1578,39 +1585,91 @@ cv.addEventListener('mouseup', e => {
               lastSelectedPathBead = null;
               renderMaterials();
           } else {
-              // 在路径上重新计算位置并排序
+              // 【核心修复】重新计算位置并排序
+              // 1. 获取目标弧长
               const targetArc = getProjectionLengthOnPath(path.points, p.x, p.y);
               
-              let arcs = [];
-              let cArc = 0;
-              for(let i=0; i<path.beads.length; i++){
-                  const b = path.beads[i];
+              // 2. 提取被拖动的珠子
+              const draggedBeadObj = path.beads[draggingPathBead.beadIdx];
+              
+              // 3. 创建不包含被拖动珠子的临时数组，用于计算其他珠子的“基础位置”
+              const otherBeads = path.beads.filter((_, i) => i !== draggingPathBead.beadIdx);
+              
+              // 4. 计算其他珠子的累积弧长位置
+              let currentArc = 0;
+              const positionedBeads = otherBeads.map((b, i) => {
                   const m = materials.find(x => x.id === b.materialId);
-                  if(!m) continue;
-                  const r = ((m.size||20)*b.scale)/2;
-                  if(i>0){
-                      const pb = path.beads[i-1];
-                      const pm = materials.find(x=>x.id===pb.materialId);
-                      if(pm){
-                          const pr = ((pm.size||20)*pb.scale)/2;
-                          cArc += pr + r + FIXED_GAP_PX;
+                  if (!m) return { bead: b, arc: 0 }; // Fallback
+                  
+                  const radius = ((m.size || 20) * b.scale) / 2;
+                  const pos = { bead: b, arc: currentArc + radius }; // 中心点弧长
+                  
+                  // 更新下一个珠子的起始弧长
+                  if (i < otherBeads.length - 1) {
+                      const nextB = otherBeads[i+1];
+                      const nextM = materials.find(x => x.id === nextB.materialId);
+                      if (nextM) {
+                          const nextRadius = ((nextM.size || 20) * nextB.scale) / 2;
+                          currentArc += radius * 2 + FIXED_GAP_PX; // 直径 + 间隙
                       }
                   }
-                  arcs.push({ bead: b, arc: cArc, isDragging: i === draggingPathBead.beadIdx });
-                  cArc += r * 2; 
+                  return pos;
+              });
+              
+              // 5. 将被拖动的珠子插入到正确的位置
+              // 我们需要根据 targetArc 找到它应该插入的位置
+              // 简单做法：将所有珠子（包括拖动的）放入一个列表，按弧长排序
+              
+              const allBeadsWithArcs = [...positionedBeads];
+              
+              // 计算拖动珠子的半径，用于确定其“中心”弧长
+              const draggedM = materials.find(x => x.id === draggedBeadObj.materialId);
+              const draggedRadius = draggedM ? ((draggedM.size || 20) * draggedBeadObj.scale) / 2 : 10;
+              
+              // 将拖动珠子加入列表，使用 targetArc 作为其参考位置
+              // 注意：为了排序准确，我们暂时用 targetArc 作为它的排序键
+              allBeadsWithArcs.push({ bead: draggedBeadObj, arc: targetArc, isDragged: true });
+              
+              // 6. 按弧长排序
+              allBeadsWithArcs.sort((a, b) => a.arc - b.arc);
+              
+              // 7. 重新生成珠子数组，并重新计算它们的实际物理位置（消除重叠）
+              const newBeadsOrder = [];
+              let rebuildArc = 0;
+              
+              for (let i = 0; i < allBeadsWithArcs.length; i++) {
+                  const item = allBeadsWithArcs[i];
+                  const m = materials.find(x => x.id === item.bead.materialId);
+                  if (!m) continue;
+                  
+                  const radius = ((m.size || 20) * item.bead.scale) / 2;
+                  
+                  // 如果这是第一个珠子，放在起点；否则放在上一个珠子之后
+                  if (i === 0) {
+                      rebuildArc = radius; 
+                  } else {
+                      const prevItem = allBeadsWithArcs[i-1];
+                      const prevM = materials.find(x => x.id === prevItem.bead.materialId);
+                      if (prevM) {
+                          const prevRadius = ((prevM.size || 20) * prevItem.bead.scale) / 2;
+                          rebuildArc += prevRadius + radius + FIXED_GAP_PX;
+                      }
+                  }
+                  
+                  // 更新珠子的实际弧长位置（虽然 beads 对象本身不存 arc，但这有助于后续逻辑如果需要）
+                  // 这里我们只需要保持顺序正确，render 时会重新计算位置
+                  newBeadsOrder.push(item.bead);
+                  
+                  // 记录新索引
+                  if (item.isDragged) {
+                      const newIdx = newBeadsOrder.length - 1;
+                      selectedPathBeads.clear();
+                      selectedPathBeads.add(path.id + '_' + newIdx);
+                      lastSelectedPathBead = { pathId: path.id, beadIdx: newIdx };
+                  }
               }
               
-              const dragArcObj = arcs.find(a => a.isDragging);
-              if(dragArcObj) dragArcObj.arc = targetArc;
-              
-              arcs.sort((a, b) => a.arc - b.arc);
-              
-              path.beads = arcs.map(a => a.bead);
-              
-              const newIdx = path.beads.indexOf(dragArcObj.bead);
-              selectedPathBeads.clear();
-              selectedPathBeads.add(path.id + '_' + newIdx);
-              lastSelectedPathBead = { pathId: path.id, beadIdx: newIdx };
+              path.beads = newBeadsOrder;
           }
       }
       
@@ -1936,7 +1995,7 @@ function savePlan() {
   const data = {
     beads: beads,
     paths: paths,
-    materials: materials.map(m => ({ id:m.id, name:m.name, color:m.color, size:m.size, price:m.price, wuxing:m.wuxing, remark: m.remark || '', stock: m.stock || 0, img: m.img && m.img.src ? m.img.src : null }))
+    materials: materials.map(m => ({ id:m.id, name:m.name, color:m.color, size:m.size, price:m.price, wuxing:m.wuxing, series: m.series || '', remark: m.remark || '', stock: m.stock || 0, img: m.img && m.img.src ? m.img.src : null }))
   };
   plans.unshift({ id: newPlanId(), name: name, time: ts(), data: data });
   renderPlans();
@@ -1957,7 +2016,7 @@ function loadPlan(id) {
     d.materials.forEach(m => {
       if (!materials.find(x => x.id === m.id)) {
         const img = new Image(); if (m.img) img.src = m.img;
-        materials.push(Object.assign({img, remark: m.remark || '', stock: m.stock || 0}, m));
+        materials.push(Object.assign({img, series: m.series || '', remark: m.remark || '', stock: m.stock || 0}, m));
       }
     });
     renderTags(); renderMaterials();
@@ -2090,6 +2149,7 @@ function copyMaterial(id) {
     size: original.size,
     price: original.price,
     wuxing: original.wuxing,
+    series: original.series || '', // 复制色系
     remark: original.remark || '',
     stock: original.stock || 0,
     img: original.img // 引用同一个图片对象
@@ -2125,7 +2185,7 @@ function addQuickBead() {
   const names = ['海蓝宝','粉晶','绿幽灵','黄水晶','紫水晶'];
   const wx = ['水','火','木','土','金'];
   const i = materials.length % colors.length;
-  materials.push({ id: newId(), name: names[i]+'_'+(materials.length+1), color: colors[i], size: 20, price: (10+Math.random()*40).toFixed(1)*1, wuxing: wx[i], img: new Image(), remark: '', stock: 99 });
+  materials.push({ id: newId(), name: names[i]+'_'+(materials.length+1), color: colors[i], size: 20, price: (10+Math.random()*40).toFixed(1)*1, wuxing: wx[i], series: '默认色系', img: new Image(), remark: '', stock: 99 });
   renderTags(); renderMaterials();
 }
 
@@ -2136,7 +2196,7 @@ function uploadImages(e) {
     r.onload = ev => {
       const img = new Image();
       img.onload = () => {
-        const m = { id: newId(), name: f.name.replace(/\.[^.]+$/,''), color: '#a0d2eb', size: 22, price: 0, wuxing: '土', img, remark: '', stock: 99 };
+        const m = { id: newId(), name: f.name.replace(/\.[^.]+$/,''), color: '#a0d2eb', size: 22, price: 0, wuxing: '土', series: '上传素材', img, remark: '', stock: 99 };
         try {
           const tc = document.createElement('canvas'); tc.width=1;tc.height=1;
           const tctx = tc.getContext('2d'); tctx.drawImage(img, 0, 0, 1, 1);
@@ -2160,6 +2220,7 @@ function openEdit(id) {
   document.getElementById('f_price').value = m.price;
   document.getElementById('f_stock').value = m.stock || 0;
   document.getElementById('f_wuxing').value = m.wuxing;
+  document.getElementById('f_series').value = m.series || ''; // 填充色系
   document.getElementById('f_remark').value = m.remark || '';
   document.getElementById('editModal').classList.add('show');
 }
@@ -2174,12 +2235,13 @@ function saveModal() {
   m.price = parseFloat(document.getElementById('f_price').value) || 0;
   m.stock = parseInt(document.getElementById('f_stock').value) || 0;
   m.wuxing = document.getElementById('f_wuxing').value;
+  m.series = document.getElementById('f_series').value; // 保存色系
   m.remark = document.getElementById('f_remark').value;
   closeModal(); renderTags(); renderMaterials(); render();
 }
 
 function exportMaterials() {
-  const data = materials.map(m => ({ id:m.id,name:m.name,color:m.color,size:m.size,price:m.price,wuxing:m.wuxing, remark: m.remark || '', stock: m.stock || 0, img: m.img && m.img.src ? m.img.src : null }));
+  const data = materials.map(m => ({ id:m.id,name:m.name,color:m.color,size:m.size,price:m.price,wuxing:m.wuxing, series: m.series || '', remark: m.remark || '', stock: m.stock || 0, img: m.img && m.img.src ? m.img.src : null }));
   downloadJSON(data, `素材库_${ts()}.json`);
 }
 
@@ -2192,7 +2254,7 @@ function importMaterials(e) {
       if (!Array.isArray(arr)) throw new Error('格式错误');
       arr.forEach(m => {
         const img = new Image(); if (m.img) img.src = m.img;
-        materials.push({ id: m.id || newId(), name: m.name||'未命名', color: m.color||'#a0d2eb', size: m.size||20, price: m.price||0, wuxing: m.wuxing||'土', remark: m.remark || '', stock: m.stock || 99, img });
+        materials.push({ id: m.id || newId(), name: m.name||'未命名', color: m.color||'#a0d2eb', size: m.size||20, price: m.price||0, wuxing: m.wuxing||'土', series: m.series || '', remark: m.remark || '', stock: m.stock || 99, img });
       });
       renderTags(); renderMaterials(); render(); alert(`成功导入 ${arr.length} 个素材`);
     } catch (err) { alert('导入失败：' + err.message); }
@@ -2214,13 +2276,13 @@ function downloadJSON(data, filename) {
 
 (function init() {
   const samples = [
-    { name:'粉晶',   color:'#f2b5c3', size:20, price:25, wuxing:'火', stock:99 },
-    { name:'绿幽灵', color:'#7cc48a', size:24, price:55, wuxing:'木', stock:99 },
-    { name:'黄水晶', color:'#e8c766', size:22, price:42, wuxing:'土', stock:99 },
-    { name:'紫水晶', color:'#b59ad6', size:20, price:48, wuxing:'金', stock:99 },
-    { name:'海蓝宝_8mm', color:'#6fb8d9', size:8, price:38, wuxing:'水', stock:99 },
+    { name:'粉晶',   color:'#f2b5c3', size:20, price:25, wuxing:'火', series:'粉色系', stock:99 },
+    { name:'绿幽灵', color:'#7cc48a', size:24, price:55, wuxing:'木', series:'绿色系', stock:99 },
+    { name:'黄水晶', color:'#e8c766', size:22, price:42, wuxing:'土', series:'黄色系', stock:99 },
+    { name:'紫水晶', color:'#b59ad6', size:20, price:48, wuxing:'金', series:'紫色系', stock:99 },
+    { name:'海蓝宝_8mm', color:'#6fb8d9', size:8, price:38, wuxing:'水', series:'蓝色系', stock:99 },
   ];
-  samples.forEach(s => { materials.push({ id:newId(), name:s.name, color:s.color, size:s.size, price:s.price, wuxing:s.wuxing, img:new Image(), remark:'', stock:s.stock }); });
+  samples.forEach(s => { materials.push({ id:newId(), name:s.name, color:s.color, size:s.size, price:s.price, wuxing:s.wuxing, series: s.series, img:new Image(), remark:'', stock:s.stock }); });
   renderTags(); renderMaterials(); renderPlans(); render();
 })();
 </script>
