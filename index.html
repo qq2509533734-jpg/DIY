@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <title>水晶手串DIY工具_手绘路径增强版_支持缩放</title>
 <style>
-  /* 保持原有样式不变 */
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -71,8 +70,8 @@
     background: linear-gradient(135deg, #eaf4fb, #f8f9fa);
     border-radius: 10px;
     padding: 10px;
-    overflow: hidden; /* 修改为 hidden，防止滚动条出现，由内部平移代替 */
-    height: 650px; /* 固定高度以便观察 */
+    overflow: hidden;
+    height: 650px;
   }
   canvas#cv {
     background: transparent;
@@ -402,7 +401,6 @@
   }
   .mat-item:hover .mat-edit-btn { opacity: 1; }
 
-  /* 新增：复制按钮样式 */
   .mat-copy-btn {
     position: absolute; bottom: 4px; left: 4px;
     font-size: 9px; padding: 1px 4px; background: #e6a157; color: #fff;
@@ -494,7 +492,6 @@
   }
   .modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
   
-  /* 新增：缩放控制按钮样式 */
   .zoom-controls {
     position: absolute;
     bottom: 20px;
@@ -526,8 +523,8 @@
 <body>
 
 <div class="app-header">
-  <h1>🔮 黑凤梨手串工具V1.1 (新增色系)</h1>
-  <p>提示：滚轮缩放，按住空格+拖拽 或 中键拖拽可移动画布</p>
+  <h1>🔮 黑凤梨手串工具V1.2 (新增路径整体移动)</h1>
+  <p>提示：滚轮缩放，按住空格+拖拽 或 中键拖拽可移动画布。选中路径后，拖动末端蓝色圆点可整体移动路径</p>
 </div>
 
 <div class="main-wrap">
@@ -658,7 +655,6 @@
         <option value="水">水</option><option value="火">火</option><option value="土">土</option>
       </select>
     </div>
-    <!-- 新增：色系字段 -->
     <div class="field"><label>色系 (自定义文案)</label><input id="f_series" type="text" placeholder="例如：莫兰迪色系、马卡龙色系"></div>
     <div class="field"><label>备注</label><input id="f_remark" type="text" maxlength="50" placeholder="请输入备注（最多50字符）"></div>
     <div class="modal-footer">
@@ -696,7 +692,6 @@
         <option value="水">水</option><option value="火">火</option><option value="土">土</option>
       </select>
     </div>
-    <!-- 新增：色系匹配 -->
     <div class="field">
       <label>匹配色系 (包含)</label>
       <input id="tag_match_series" type="text" placeholder="素材色系包含此关键词">
@@ -736,20 +731,23 @@ let isDrawing = false;
 let currentPathPoints = [];
 let selectedPathId = null;
 
-// 新增：路径珠子选中状态
-let selectedPathBeads = new Set(); // 存储 "pathId_beadIdx"
-let lastSelectedPathBead = null; // { pathId, beadIdx }
+let selectedPathBeads = new Set(); 
+let lastSelectedPathBead = null; 
 
-// 新增：路径珠子拖动状态
-let draggingPathBead = null; // { pathId, beadIdx }
+let draggingPathBead = null; 
 
-// === 新增：视图缩放与平移状态 ===
+// === 新增：路径整体拖动状态 ===
+let draggingPathId = null;
+let dragPathStartMouse = null;
+let dragPathOriginalPoints = null;
+
+// === 视图缩放与平移状态 ===
 let viewScale = 1;
 let viewOffsetX = 0;
 let viewOffsetY = 0;
 let isPanning = false;
 let panStart = { x: 0, y: 0 };
-let isSpacePressed = false; // 用于检测空格键平移
+let isSpacePressed = false; 
 
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
@@ -798,10 +796,9 @@ function resetCanvas() {
   document.getElementById('cvHeight').value = 800;
   document.getElementById('cvBgColor').value = '#ffffff';
   applyCanvasSettings();
-  resetView(); // 重置视图缩放
+  resetView(); 
 }
 
-// === 新增：视图控制函数 ===
 function resetView() {
   viewScale = 1;
   viewOffsetX = 0;
@@ -819,7 +816,6 @@ function zoomOut() {
   render();
 }
 
-// 修改：增加色系匹配逻辑
 function matchTagRules(material, tag) {
   const rules = tag.rules;
   if (rules.name && rules.name.trim()) {
@@ -836,7 +832,6 @@ function matchTagRules(material, tag) {
   if (rules.wuxing && rules.wuxing.trim()) {
     if (material.wuxing !== rules.wuxing.trim()) return false;
   }
-  // 新增：色系匹配 (模糊匹配)
   if (rules.series && rules.series.trim()) {
     const matSeries = (material.series || '').toLowerCase();
     const ruleSeries = rules.series.trim().toLowerCase();
@@ -904,7 +899,7 @@ function openAddTagModal() {
   document.getElementById('tag_match_size').value = '';
   document.getElementById('tag_match_price').value = '';
   document.getElementById('tag_match_wuxing').value = '';
-  document.getElementById('tag_match_series').value = ''; // 重置色系
+  document.getElementById('tag_match_series').value = ''; 
   document.getElementById('addTagModal').classList.add('show');
 }
 
@@ -919,7 +914,7 @@ function saveNewTag() {
   const matchSize = document.getElementById('tag_match_size').value;
   const matchPrice = document.getElementById('tag_match_price').value;
   const matchWuxing = document.getElementById('tag_match_wuxing').value;
-  const matchSeries = document.getElementById('tag_match_series').value.trim(); // 获取色系
+  const matchSeries = document.getElementById('tag_match_series').value.trim(); 
   
   if (!matchName && !matchSize && !matchPrice && !matchWuxing && !matchSeries) {
     alert('请至少设置一个匹配规则'); return;
@@ -932,7 +927,7 @@ function saveNewTag() {
       size: matchSize ? parseFloat(matchSize) : '', 
       price: matchPrice ? parseFloat(matchPrice) : '', 
       wuxing: matchWuxing,
-      series: matchSeries // 保存色系规则
+      series: matchSeries 
     }
   });
   closeAddTagModal();
@@ -955,7 +950,6 @@ function matchMaterial(m, query) {
     const val = parseFloat(q);
     if (m.price === val) return true;
   }
-  // 增加色系搜索
   const fields = [m.name, m.size.toString(), m.color, m.remark || '', m.wuxing, m.series || ''].map(f => f.toLowerCase());
   return fields.some(f => f.includes(ql));
 }
@@ -995,7 +989,6 @@ function computeLayout() {
   return { R, angles, centers, viewScale: layoutViewScale, totalCircumference };
 }
 
-// 重构：物理逻辑排列路径珠子
 function getPathBeadCenters(path) {
   if (!path.points || path.points.length < 2 || path.beads.length === 0) return [];
   
@@ -1071,7 +1064,6 @@ function getPathBeadCenters(path) {
   return beadCenters;
 }
 
-// 新增：计算鼠标位置在路径上的投影弧长
 function getProjectionLengthOnPath(points, mx, my) {
   if (!points || points.length < 2) return 0;
   let minDist = Infinity;
@@ -1114,22 +1106,27 @@ function getProjectionLengthOnPath(points, mx, my) {
   return bestLen;
 }
 
+// === 新增：获取路径控制点坐标 ===
+function getPathControlPoint(path) {
+    if (!path || path.points.length === 0) return null;
+    const lastPt = path.points[path.points.length - 1];
+    const offset = 25 / viewScale; 
+    return { x: lastPt.x + offset, y: lastPt.y };
+}
+
 function render() {
   ctx.clearRect(0, 0, W, H);
   
-  // 1. 绘制背景 (不受缩放影响，始终填满 Canvas)
   const bg = ctx.createRadialGradient(CX, CY, 50, CX, CY, Math.max(W, H) * 0.6);
   bg.addColorStop(0, lighten(canvasBgColor, 8));
   bg.addColorStop(1, canvasBgColor);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
-  // 2. 应用视图变换
   ctx.save();
   ctx.translate(viewOffsetX, viewOffsetY);
   ctx.scale(viewScale, viewScale);
 
-  // 3. 绘制内容 (受缩放影响)
   if (beads.length > 0) {
     const layout = computeLayout();
     const { R, centers, viewScale: layoutVS } = layout;
@@ -1181,16 +1178,13 @@ function render() {
           ctx.setLineDash([]);
       }
       
-      // 如果正在拖动此路径的珠子，我们需要特殊处理渲染
       const isDraggingThisPath = draggingPathBead && draggingPathBead.pathId === path.id;
       
       if (isDraggingThisPath) {
-          // 实时计算其余珠子的位置（排除被拖动的珠子）
           const tempBeads = path.beads.filter((_, i) => i !== draggingPathBead.beadIdx);
           const tempPath = { ...path, beads: tempBeads };
           const otherCenters = getPathBeadCenters(tempPath);
           
-          // 绘制其余珠子
           let otherIdx = 0;
           for(let i=0; i<path.beads.length; i++) {
               if (i === draggingPathBead.beadIdx) continue;
@@ -1200,7 +1194,6 @@ function render() {
               drawBead(b, c.x, c.y, isPathBeadSelected, 1); 
           }
       } else {
-          // 正常绘制所有珠子
           const beadCenters = getPathBeadCenters(path);
           const count = Math.min(path.beads.length, beadCenters.length);
           for(let i=0; i<count; i++) {
@@ -1211,14 +1204,35 @@ function render() {
           }
       }
       
+      // === 新增：绘制路径整体移动控制点 ===
+      if (isSelected && path.points.length > 0) {
+          const ctrlPt = getPathControlPoint(path);
+          const ctrlR = 10 / viewScale;
+          
+          ctx.beginPath();
+          ctx.arc(ctrlPt.x, ctrlPt.y, ctrlR, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(160, 210, 235, 0.9)';
+          ctx.fill();
+          ctx.strokeStyle = '#2c5f7c';
+          ctx.lineWidth = 1.5 / viewScale;
+          ctx.stroke();
+          
+          // 内部十字图标
+          ctx.beginPath();
+          ctx.moveTo(ctrlPt.x - ctrlR * 0.4, ctrlPt.y);
+          ctx.lineTo(ctrlPt.x + ctrlR * 0.4, ctrlPt.y);
+          ctx.moveTo(ctrlPt.x, ctrlPt.y - ctrlR * 0.4);
+          ctx.lineTo(ctrlPt.x, ctrlPt.y + ctrlR * 0.4);
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 1.5 / viewScale;
+          ctx.stroke();
+      }
+      
       ctx.restore();
   });
 
-  ctx.restore(); // 恢复变换，以下绘制 UI 层（删除区等）
+  ctx.restore(); 
 
-  // 4. 绘制 UI 层 (删除区域等，不受缩放影响，保持在屏幕固定位置)
-  
-  // 绘制路径珠子拖动预览
   if (draggingPathBead && dragPos) {
       const path = paths.find(p => p.id === draggingPathBead.pathId);
       if (path && path.beads[draggingPathBead.beadIdx]) {
@@ -1237,13 +1251,10 @@ function render() {
           ctx.textBaseline = 'middle';
           ctx.fillText(isInDelZone ? '松开删除' : '拖至此处删除', DEL_ZONE_X + DEL_ZONE_W/2, DEL_ZONE_Y + DEL_ZONE_H/2);
 
-          // 注意：这里的 dragPos 包含 screenX/Y 和 worldX/Y
-          // drawBead 需要世界坐标
           drawBead(b, dragPos.x, dragPos.y, true, 1);
       }
   }
 
-  // 绘制圆环珠子拖动预览
   if (draggingIdx >= 0 && dragPos) {
     const isInDelZone = dragPos.screenX >= DEL_ZONE_X && dragPos.screenX <= DEL_ZONE_X + DEL_ZONE_W &&
                         dragPos.screenY >= DEL_ZONE_Y && dragPos.screenY <= DEL_ZONE_Y + DEL_ZONE_H;
@@ -1369,21 +1380,17 @@ function updateSelectedBeadText() {
   container.innerHTML = html;
 }
 
-// === 修改：坐标转换 ===
 function getMouse(e) {
   const rect = cv.getBoundingClientRect();
-  // 屏幕坐标相对于 Canvas 左上角
   const screenX = (e.clientX - rect.left) * (cv.width / rect.width);
   const screenY = (e.clientY - rect.top) * (cv.height / rect.height);
   
-  // 转换为世界坐标 (减去偏移，除以缩放)
   const worldX = (screenX - viewOffsetX) / viewScale;
   const worldY = (screenY - viewOffsetY) / viewScale;
   
   return { x: worldX, y: worldY, screenX, screenY };
 }
 
-// 新增：检测路径珠子点击
 function hitPathBead(mx, my) {
   for (let pIdx = paths.length - 1; pIdx >= 0; pIdx--) {
     const path = paths[pIdx];
@@ -1415,27 +1422,42 @@ function hitBead(mx, my) {
   return -1;
 }
 
-// === 修改：鼠标事件处理 ===
 cv.addEventListener('mousedown', e => {
   const p = getMouse(e);
   
-  // 1. 处理画布平移 (空格键 或 中键)
   if (isSpacePressed || e.button === 1) {
     isPanning = true;
     panStart = { x: e.clientX, y: e.clientY };
     cv.classList.add('panning');
-    e.preventDefault(); // 防止中键滚动
+    e.preventDefault(); 
     return;
   }
 
   if (isDrawMode) {
       isDrawing = true;
-      currentPathPoints = [p]; // p 是世界坐标
+      currentPathPoints = [p]; 
       cv.classList.add('drawing');
       return;
   }
 
-  // 2. 优先检测路径珠子
+  // === 新增：优先检测选中路径的控制点（整体移动手柄） ===
+  if (selectedPathId) {
+      const selPath = paths.find(p => p.id === selectedPathId);
+      if (selPath && selPath.points.length > 0) {
+          const ctrlPt = getPathControlPoint(selPath);
+          const r = 14 / viewScale; // 点击判定范围稍大
+          const dx = p.x - ctrlPt.x;
+          const dy = p.y - ctrlPt.y;
+          if (dx * dx + dy * dy <= r * r) {
+              draggingPathId = selectedPathId;
+              dragPathStartMouse = { x: p.x, y: p.y };
+              dragPathOriginalPoints = selPath.points.map(pt => ({ x: pt.x, y: pt.y }));
+              cv.classList.add('dragging');
+              return;
+          }
+      }
+  }
+
   const pathBeadHit = hitPathBead(p.x, p.y);
   if (pathBeadHit) {
     const key = pathBeadHit.pathId + '_' + pathBeadHit.beadIdx;
@@ -1452,9 +1474,8 @@ cv.addEventListener('mousedown', e => {
     lastSelectedIdx = -1;
     selectedPathId = pathBeadHit.pathId;
     
-    // 新增：开始拖动路径珠子
     draggingPathBead = pathBeadHit;
-    dragPos = { x: p.x, y: p.y, screenX: p.screenX, screenY: p.screenY }; // 世界坐标 + 屏幕坐标
+    dragPos = { x: p.x, y: p.y, screenX: p.screenX, screenY: p.screenY }; 
     cv.classList.add('dragging');
     
     renderPathList();
@@ -1464,10 +1485,8 @@ cv.addEventListener('mousedown', e => {
     return;
   }
 
-  // 3. 检测圆环珠子
   const idx = hitBead(p.x, p.y);
   if (idx >= 0) {
-    // 清空路径珠子选中
     selectedPathBeads.clear();
     lastSelectedPathBead = null;
 
@@ -1487,13 +1506,11 @@ cv.addEventListener('mousedown', e => {
       lastSelectedIdx = idx;
     }
     draggingIdx = idx;
-    dragPos = { x: p.x, y: p.y, screenX: p.screenX, screenY: p.screenY }; // 世界坐标 + 屏幕坐标
+    dragPos = { x: p.x, y: p.y, screenX: p.screenX, screenY: p.screenY }; 
     cv.classList.add('dragging');
     updateAdjustPanel();
     render();
   } else {
-    // 点击空白处：如果不是绘图模式，可以视为取消选择或开始平移（如果配置了）
-    // 这里保持原有逻辑：取消选择
     selectedPathId = null;
     selectedPathBeads.clear();
     lastSelectedPathBead = null;
@@ -1509,7 +1526,6 @@ cv.addEventListener('mousedown', e => {
 cv.addEventListener('mousemove', e => {
   const p = getMouse(e);
   
-  // 处理画布平移
   if (isPanning) {
     const dx = e.clientX - panStart.x;
     const dy = e.clientY - panStart.y;
@@ -1521,25 +1537,54 @@ cv.addEventListener('mousemove', e => {
   }
 
   if (isDrawing) {
-      currentPathPoints.push(p); // p 是世界坐标
+      currentPathPoints.push(p); 
       render();
       return;
   }
   
-  // 新增：拖动路径珠子
+  // === 新增：处理路径整体拖动 ===
+  if (draggingPathId) {
+      const path = paths.find(p => p.id === draggingPathId);
+      if (path) {
+          const dx = p.x - dragPathStartMouse.x;
+          const dy = p.y - dragPathStartMouse.y;
+          for (let i = 0; i < path.points.length; i++) {
+              path.points[i].x = dragPathOriginalPoints[i].x + dx;
+              path.points[i].y = dragPathOriginalPoints[i].y + dy;
+          }
+          render();
+      }
+      return;
+  }
+
   if (draggingPathBead) {
       dragPos = { x: p.x, y: p.y, screenX: p.screenX, screenY: p.screenY };
       render();
       return;
   }
   
-  if (draggingIdx < 0) return;
+  if (draggingIdx < 0) {
+      // === 新增：悬停控制点时改变光标 ===
+      let onCtrl = false;
+      if (selectedPathId) {
+          const selPath = paths.find(p => p.id === selectedPathId);
+          if (selPath && selPath.points.length > 0) {
+              const ctrlPt = getPathControlPoint(selPath);
+              const r = 14 / viewScale;
+              const dx = p.x - ctrlPt.x;
+              const dy = p.y - ctrlPt.y;
+              if (dx * dx + dy * dy <= r * r) onCtrl = true;
+          }
+      }
+      cv.style.cursor = onCtrl ? 'move' : '';
+      return;
+  }
+  
   dragPos = { x: p.x, y: p.y, screenX: p.screenX, screenY: p.screenY };
   render();
 });
 
 cv.addEventListener('mouseup', e => {
-  // 结束平移
   if (isPanning) {
     isPanning = false;
     cv.classList.remove('panning');
@@ -1566,7 +1611,15 @@ cv.addEventListener('mouseup', e => {
       return;
   }
 
-  // 新增：结束拖动路径珠子
+  // === 新增：结束路径整体拖动 ===
+  if (draggingPathId) {
+      draggingPathId = null;
+      dragPathStartMouse = null;
+      dragPathOriginalPoints = null;
+      cv.classList.remove('dragging');
+      return;
+  }
+
   if (draggingPathBead) {
       const isInDelZone = p.screenX >= DEL_ZONE_X && p.screenX <= DEL_ZONE_X + DEL_ZONE_W &&
                           p.screenY >= DEL_ZONE_Y && p.screenY <= DEL_ZONE_Y + DEL_ZONE_H;
@@ -1574,7 +1627,6 @@ cv.addEventListener('mouseup', e => {
       const path = paths.find(x => x.id === draggingPathBead.pathId);
       if (path) {
           if (isInDelZone) {
-              // 删除珠子
               const deletedBead = path.beads[draggingPathBead.beadIdx];
               const m = materials.find(x => x.id === deletedBead.materialId);
               if (m) m.stock = (m.stock || 0) + 1;
@@ -1585,55 +1637,38 @@ cv.addEventListener('mouseup', e => {
               lastSelectedPathBead = null;
               renderMaterials();
           } else {
-              // 【核心修复】重新计算位置并排序
-              // 1. 获取目标弧长
               const targetArc = getProjectionLengthOnPath(path.points, p.x, p.y);
-              
-              // 2. 提取被拖动的珠子
               const draggedBeadObj = path.beads[draggingPathBead.beadIdx];
-              
-              // 3. 创建不包含被拖动珠子的临时数组，用于计算其他珠子的“基础位置”
               const otherBeads = path.beads.filter((_, i) => i !== draggingPathBead.beadIdx);
               
-              // 4. 计算其他珠子的累积弧长位置
               let currentArc = 0;
               const positionedBeads = otherBeads.map((b, i) => {
                   const m = materials.find(x => x.id === b.materialId);
-                  if (!m) return { bead: b, arc: 0 }; // Fallback
+                  if (!m) return { bead: b, arc: 0 }; 
                   
                   const radius = ((m.size || 20) * b.scale) / 2;
-                  const pos = { bead: b, arc: currentArc + radius }; // 中心点弧长
+                  const pos = { bead: b, arc: currentArc + radius }; 
                   
-                  // 更新下一个珠子的起始弧长
                   if (i < otherBeads.length - 1) {
                       const nextB = otherBeads[i+1];
                       const nextM = materials.find(x => x.id === nextB.materialId);
                       if (nextM) {
                           const nextRadius = ((nextM.size || 20) * nextB.scale) / 2;
-                          currentArc += radius * 2 + FIXED_GAP_PX; // 直径 + 间隙
+                          currentArc += radius * 2 + FIXED_GAP_PX; 
                       }
                   }
                   return pos;
               });
               
-              // 5. 将被拖动的珠子插入到正确的位置
-              // 我们需要根据 targetArc 找到它应该插入的位置
-              // 简单做法：将所有珠子（包括拖动的）放入一个列表，按弧长排序
-              
               const allBeadsWithArcs = [...positionedBeads];
               
-              // 计算拖动珠子的半径，用于确定其“中心”弧长
               const draggedM = materials.find(x => x.id === draggedBeadObj.materialId);
               const draggedRadius = draggedM ? ((draggedM.size || 20) * draggedBeadObj.scale) / 2 : 10;
               
-              // 将拖动珠子加入列表，使用 targetArc 作为其参考位置
-              // 注意：为了排序准确，我们暂时用 targetArc 作为它的排序键
               allBeadsWithArcs.push({ bead: draggedBeadObj, arc: targetArc, isDragged: true });
               
-              // 6. 按弧长排序
               allBeadsWithArcs.sort((a, b) => a.arc - b.arc);
               
-              // 7. 重新生成珠子数组，并重新计算它们的实际物理位置（消除重叠）
               const newBeadsOrder = [];
               let rebuildArc = 0;
               
@@ -1644,7 +1679,6 @@ cv.addEventListener('mouseup', e => {
                   
                   const radius = ((m.size || 20) * item.bead.scale) / 2;
                   
-                  // 如果这是第一个珠子，放在起点；否则放在上一个珠子之后
                   if (i === 0) {
                       rebuildArc = radius; 
                   } else {
@@ -1656,11 +1690,8 @@ cv.addEventListener('mouseup', e => {
                       }
                   }
                   
-                  // 更新珠子的实际弧长位置（虽然 beads 对象本身不存 arc，但这有助于后续逻辑如果需要）
-                  // 这里我们只需要保持顺序正确，render 时会重新计算位置
                   newBeadsOrder.push(item.bead);
                   
-                  // 记录新索引
                   if (item.isDragged) {
                       const newIdx = newBeadsOrder.length - 1;
                       selectedPathBeads.clear();
@@ -1699,7 +1730,6 @@ cv.addEventListener('mouseup', e => {
     renderMaterials();
   } else {
     const layout = computeLayout();
-    // 注意：这里计算角度需要基于中心点 CX, CY，它们是逻辑坐标
     const dx = p.x - CX, dy = p.y - CY;
     let ang = Math.atan2(dy, dx);
     const baseAngle = -Math.PI / 2;
@@ -1742,9 +1772,15 @@ cv.addEventListener('mouseleave', () => {
   if (draggingIdx >= 0) { draggingIdx = -1; dragPos = null; cv.classList.remove('dragging'); render(); }
   if (draggingPathBead) { draggingPathBead = null; dragPos = null; cv.classList.remove('dragging'); render(); }
   if (isPanning) { isPanning = false; cv.classList.remove('panning'); }
+  // === 新增：清理路径整体拖动状态 ===
+  if (draggingPathId) {
+      draggingPathId = null;
+      dragPathStartMouse = null;
+      dragPathOriginalPoints = null;
+      cv.classList.remove('dragging');
+  }
 });
 
-// === 新增：滚轮缩放 ===
 cv.addEventListener('wheel', e => {
   e.preventDefault();
   const rect = cv.getBoundingClientRect();
@@ -1757,8 +1793,6 @@ cv.addEventListener('wheel', e => {
   
   const newScale = Math.max(0.2, Math.min(5, viewScale * factor));
   
-  // 以鼠标为中心缩放
-  // 公式: offset = mouse - (mouse - oldOffset) * (newScale / oldScale)
   viewOffsetX = mouseX - (mouseX - viewOffsetX) * (newScale / viewScale);
   viewOffsetY = mouseY - (mouseY - viewOffsetY) * (newScale / viewScale);
   viewScale = newScale;
@@ -1766,7 +1800,6 @@ cv.addEventListener('wheel', e => {
   render();
 }, { passive: false });
 
-// === 新增：键盘事件监听空格 ===
 window.addEventListener('keydown', e => {
   if (e.code === 'Space') {
     isSpacePressed = true;
@@ -1777,7 +1810,7 @@ window.addEventListener('keydown', e => {
 window.addEventListener('keyup', e => {
   if (e.code === 'Space') {
     isSpacePressed = false;
-    cv.style.cursor = ''; // 恢复默认
+    cv.style.cursor = ''; 
     if (!isPanning) cv.classList.remove('panning');
   }
 });
@@ -1846,7 +1879,6 @@ function deleteSelectedPath() {
     render();
 }
 
-// 重构：支持路径珠子调整
 function updateAdjustPanel() {
   const body = document.getElementById('adjustBody');
   let html = '';
@@ -1968,11 +2000,12 @@ function clearBracelet() {
 }
 
 function exportImage() {
-  // 导出时需要重置视图，否则只导出当前视野
   const tempScale = viewScale;
   const tempOffX = viewOffsetX;
   const tempOffY = viewOffsetY;
+  const tempSelPath = selectedPathId;
   
+  selectedPathId = null; // 临时取消选中，隐藏控制点
   resetView();
   render();
   
@@ -1981,7 +2014,7 @@ function exportImage() {
   link.href = cv.toDataURL('image/png');
   link.click();
   
-  // 恢复视图
+  selectedPathId = tempSelPath; // 恢复
   viewScale = tempScale;
   viewOffsetX = tempOffX;
   viewOffsetY = tempOffY;
@@ -2117,7 +2150,6 @@ document.getElementById('matList').addEventListener('click', function(e) {
     return;
   }
 
-  // 新增：复制按钮点击事件
   const copyBtn = e.target.closest('.mat-copy-btn');
   if (copyBtn) {
     e.stopPropagation();
@@ -2136,12 +2168,10 @@ document.getElementById('matList').addEventListener('click', function(e) {
   }
 });
 
-// 新增：复制素材逻辑
 function copyMaterial(id) {
   const original = materials.find(m => m.id === id);
   if (!original) return;
   
-  // 创建副本，保留所有属性
   const newMat = {
     id: newId(),
     name: original.name + '_副本',
@@ -2149,10 +2179,10 @@ function copyMaterial(id) {
     size: original.size,
     price: original.price,
     wuxing: original.wuxing,
-    series: original.series || '', // 复制色系
+    series: original.series || '', 
     remark: original.remark || '',
     stock: original.stock || 0,
-    img: original.img // 引用同一个图片对象
+    img: original.img 
   };
   
   materials.push(newMat);
@@ -2220,7 +2250,7 @@ function openEdit(id) {
   document.getElementById('f_price').value = m.price;
   document.getElementById('f_stock').value = m.stock || 0;
   document.getElementById('f_wuxing').value = m.wuxing;
-  document.getElementById('f_series').value = m.series || ''; // 填充色系
+  document.getElementById('f_series').value = m.series || ''; 
   document.getElementById('f_remark').value = m.remark || '';
   document.getElementById('editModal').classList.add('show');
 }
@@ -2235,7 +2265,7 @@ function saveModal() {
   m.price = parseFloat(document.getElementById('f_price').value) || 0;
   m.stock = parseInt(document.getElementById('f_stock').value) || 0;
   m.wuxing = document.getElementById('f_wuxing').value;
-  m.series = document.getElementById('f_series').value; // 保存色系
+  m.series = document.getElementById('f_series').value; 
   m.remark = document.getElementById('f_remark').value;
   closeModal(); renderTags(); renderMaterials(); render();
 }
