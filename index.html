@@ -604,7 +604,7 @@
   }
   @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
   
-  .modal-header { display: flex; justify-content: flex-start; align-items: center; margin-bottom: 20px; }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
   .modal-title { font-size: 18px; font-weight: bold; color: var(--primary); }
   .close-modal { font-size: 24px; color: #999; background: none; border: none; cursor: pointer; }
 
@@ -624,6 +624,26 @@
   .btn-warn { background: #e6a157; color: #fff; }
   .btn-ghost { background: #f0f4f8; color: #667; }
 
+
+  .custom-attr-row {
+    display: flex; gap: 8px; align-items: center;
+  }
+  .custom-attr-row input {
+    flex: 1; padding: 8px; border: 1px solid #d5e3ec; border-radius: 6px; font-size: 13px;
+    background: #f9fbfd;
+  }
+  .custom-attr-row .attr-key-input {
+    flex: 0 0 35%;
+  }
+  .custom-attr-row .attr-val-input {
+    flex: 1;
+  }
+  .custom-attr-row .attr-del-btn {
+    width: 28px; height: 28px; border-radius: 50%; border: none;
+    background: #fee; color: var(--danger); font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .custom-attr-row .attr-del-btn:hover { background: #fdd; }
   .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
   .modal-actions button { flex: 1; }
 
@@ -825,7 +845,7 @@
 </div>
 
 <!-- 编辑素材模态框 -->
-<div class="modal-mask" id="editModal">
+<div class="modal-mask" id="editModal" onclick="closeModalOnMask(event)">
   <div class="modal-box">
     <div class="modal-header">
       <span class="modal-title">编辑素材</span>
@@ -847,6 +867,17 @@
     <div class="form-group"><label class="form-label">色系</label><input id="f_series" class="form-input" type="text" placeholder="如：莫兰迪色系"></div>
     <div class="form-group"><label class="form-label">备注</label><input id="f_remark" class="form-input" type="text" maxlength="50" placeholder="最多50字符"></div>
     
+
+    <!-- 自定义属性区域 -->
+    <div style="border-top:1px solid var(--border); padding-top:16px; margin-top:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <label class="form-label" style="margin:0; font-size:14px; font-weight:600; color:var(--primary);">自定义属性</label>
+        <button type="button" class="btn-primary" style="padding:4px 12px; font-size:12px; border:none; border-radius:6px; cursor:pointer; background:var(--accent); color:var(--primary); font-weight:600;" onclick="addCustomAttrRow()">＋ 新增属性</button>
+      </div>
+      <div id="customAttrsContainer" style="display:flex; flex-direction:column; gap:8px;">
+        <!-- Custom attribute rows will be added here -->
+      </div>
+    </div>
     <div class="modal-actions">
       <button class="btn-warn btn-block" onclick="copyMaterial()">复制</button>
       <button class="btn-danger btn-block" onclick="deleteMaterial()">删除</button>
@@ -856,7 +887,7 @@
 </div>
 
 <!-- 新增筛选标签模态框 -->
-<div class="modal-mask" id="addTagModal">
+<div class="modal-mask" id="addTagModal" onclick="closeModalOnMask(event)">
   <div class="modal-box">
     <div class="modal-header">
       <span class="modal-title">新增筛选标签</span>
@@ -873,6 +904,8 @@
       </select>
     </div>
     <div class="form-group"><label class="form-label">匹配色系（包含）</label><input id="tag_match_series" class="form-input" type="text" placeholder="如：莫兰迪"></div>
+    <!-- 动态自定义属性匹配字段 -->
+    <div id="tagCustomAttrRules" style="display:flex; flex-direction:column; gap:10px;"></div>
     <button class="btn-primary btn-block" onclick="saveNewTag()">创建标签</button>
   </div>
 </div>
@@ -880,7 +913,7 @@
 <div class="toast" id="toast">操作成功</div>
 
 <!-- 保存方案模态框 -->
-<div class="modal-mask" id="savePlanModal">
+<div class="modal-mask" id="savePlanModal" onclick="closeModalOnMask(event)">
   <div class="modal-box" onclick="event.stopPropagation()">
     <div class="modal-header">
       <span class="modal-title">保存方案</span>
@@ -899,7 +932,7 @@
 
 <script>
 // === 核心数据与状态 ===
-let materials = [];
+let materials = [];let allAttrKeys = []; // 全局属性名列表
 let beads = []; 
 let paths = []; 
 let selectedSet = new Set(); 
@@ -2266,6 +2299,15 @@ function matchTagRules(material, tag) {
     const ruleSeries = rules.series.trim().toLowerCase();
     if (!matSeries.includes(ruleSeries)) return false;
   }
+  // 检查自定义属性匹配
+  if (rules.customAttrs) {
+    for (const key in rules.customAttrs) {
+      const ruleVal = rules.customAttrs[key].toLowerCase();
+      const matAttr = (material.customAttrs || []).find(a => a.key === key);
+      const matVal = matAttr ? matAttr.value.toLowerCase() : '';
+      if (!matVal.includes(ruleVal)) return false;
+    }
+  }
   return true;
 }
 
@@ -2305,7 +2347,21 @@ function openAddTagModal() {
   document.getElementById('tag_match_price').value = '';
   document.getElementById('tag_match_wuxing').value = '';
   document.getElementById('tag_match_series').value = '';
+  // 渲染自定义属性匹配字段
+  renderTagCustomAttrRules();
   document.getElementById('addTagModal').classList.add('show');
+}
+
+function renderTagCustomAttrRules() {
+  const container = document.getElementById('tagCustomAttrRules');
+  container.innerHTML = '';
+  if (allAttrKeys.length === 0) return;
+  allAttrKeys.forEach(key => {
+    const div = document.createElement('div');
+    div.className = 'form-group';
+    div.innerHTML = `<label class="form-label">匹配属性「${key}」</label><input class="form-input tag-custom-attr-match" data-key="${key}" type="text" placeholder="输入匹配值"></div>`;
+    container.appendChild(div);
+  });
 }
 
 function closeAddTagModal() {
@@ -2320,19 +2376,30 @@ function saveNewTag() {
   const matchPrice = document.getElementById('tag_match_price').value;
   const matchWuxing = document.getElementById('tag_match_wuxing').value;
   const matchSeries = document.getElementById('tag_match_series').value.trim();
-  
-  if (!matchName && !matchSize && !matchPrice && !matchWuxing && !matchSeries) {
+
+  // 收集自定义属性匹配值
+  const customAttrMatches = {};
+  document.querySelectorAll('.tag-custom-attr-match').forEach(input => {
+    const key = input.getAttribute('data-key');
+    const val = input.value.trim();
+    if (key && val) {
+      customAttrMatches[key] = val;
+    }
+  });
+
+  if (!matchName && !matchSize && !matchPrice && !matchWuxing && !matchSeries && Object.keys(customAttrMatches).length === 0) {
     showToast('请至少设置一个匹配规则'); return;
   }
-  
+
   customTags.push({
     id: newTagId(), name: name,
-    rules: { 
-      name: matchName, 
-      size: matchSize ? parseFloat(matchSize) : '', 
-      price: matchPrice ? parseFloat(matchPrice) : '', 
-      wuxing: matchWuxing,
-      series: matchSeries
+    rules: {
+       name: matchName,
+       size: matchSize ? parseFloat(matchSize) : '',
+       price: matchPrice ? parseFloat(matchPrice) : '',
+       wuxing: matchWuxing,
+      series: matchSeries,
+       customAttrs: customAttrMatches
     }
   });
   closeAddTagModal();
@@ -3227,10 +3294,19 @@ function openEdit(id) {
   document.getElementById('f_wuxing').value = m.wuxing;
   document.getElementById('f_series').value = m.series || '';
   document.getElementById('f_remark').value = m.remark || '';
+  // 加载自定义属性
+  renderEditCustomAttrs(m.customAttrs || []);
   document.getElementById('editModal').classList.add('show');
 }
 
 function closeModal() { document.getElementById('editModal').classList.remove('show'); editingMatId = null; }
+function closeModalOnMask(e) {
+  if (e.target.classList.contains('modal-mask')) {
+    e.target.classList.remove('show');
+    // Also close savePlanModal if it's the one being clicked
+    if (e.target.id === 'editModal') { editingMatId = null; }
+  }
+}
 
 function saveModal() {
   const m = materials.find(x => x.id === editingMatId); if (!m) return;
@@ -3242,6 +3318,30 @@ function saveModal() {
   m.wuxing = document.getElementById('f_wuxing').value;
   m.series = document.getElementById('f_series').value;
   m.remark = document.getElementById('f_remark').value;
+  // 保存自定义属性
+  const attrRows = document.querySelectorAll('#customAttrsContainer .custom-attr-row');
+  const customAttrs = [];
+  attrRows.forEach(row => {
+    const key = row.querySelector('.attr-key-input').value.trim();
+    const val = row.querySelector('.attr-val-input').value.trim();
+    if (key) {
+      customAttrs.push({ key, value: val });
+      // 同步属性名到全局列表
+      if (!allAttrKeys.includes(key)) {
+        allAttrKeys.push(key);
+        // 为新属性名在所有其他素材中同步添加空值
+        materials.forEach(otherM => {
+          if (otherM.id !== m.id) {
+            if (!otherM.customAttrs) otherM.customAttrs = [];
+            if (!otherM.customAttrs.find(a => a.key === key)) {
+              otherM.customAttrs.push({ key, value: '' });
+            }
+          }
+        });
+      }
+    }
+  });
+  m.customAttrs = customAttrs;
   closeModal(); renderTags(); renderMaterials(); scheduleRender(); hitCanvasCache.clear();
   showToast('修改已保存');
 }
@@ -3263,9 +3363,54 @@ function deleteMaterial() {
   showToast('已删除');
 }
 
+
+function renderEditCustomAttrs(attrs) {
+  const container = document.getElementById('customAttrsContainer');
+  container.innerHTML = '';
+  // 使用全局属性名列表，如果为空则使用当前素材的属性
+  const keysToShow = allAttrKeys.length > 0 ? allAttrKeys : [];
+  if (keysToShow.length === 0 && (!attrs || attrs.length === 0)) {
+    container.innerHTML = '<div style="font-size:12px; color:#99a; text-align:center; padding:12px;">暂无自定义属性，点击"新增属性"添加</div>';
+    return;
+  }
+  keysToShow.forEach((key, idx) => {
+    // 查找该key在当前素材中的值
+    const existingAttr = attrs ? attrs.find(a => a.key === key) : null;
+    addCustomAttrRowInternal(key, existingAttr ? existingAttr.value : '', idx);
+  });
+}
+
+function addCustomAttrRow() {
+  const container = document.getElementById('customAttrsContainer');
+  // Remove the "暂无" hint if present
+  const hint = container.querySelector('[style*="暂无"]');
+  if (hint) hint.remove();
+  addCustomAttrRowInternal('', '', null);
+}
+
+function addCustomAttrRowInternal(key, value, idx) {
+  const container = document.getElementById('customAttrsContainer');
+  const row = document.createElement('div');
+  row.className = 'custom-attr-row';
+  row.innerHTML = `
+    <input type="text" class="attr-key-input" placeholder="属性名" value="${key}" />
+    <input type="text" class="attr-val-input" placeholder="属性值" value="${value}" />
+    <button type="button" class="attr-del-btn" onclick="removeCustomAttrRow(this)" title="删除">×</button>
+  `;
+  container.appendChild(row);
+}
+
+function removeCustomAttrRow(btn) {
+  const row = btn.parentElement;
+  row.remove();
+  const container = document.getElementById('customAttrsContainer');
+  if (container.querySelectorAll('.custom-attr-row').length === 0) {
+    container.innerHTML = '<div style="font-size:12px; color:#99a; text-align:center; padding:12px;">暂无自定义属性，点击"新增属性"添加</div>';
+  }
+}
 function exportMaterials() {
-  const data = materials.map(m => ({ id:m.id,name:m.name,color:m.color,size:m.size,price:m.price,wuxing:m.wuxing, series: m.series || '', remark: m.remark || '', stock: m.stock || 0, img: m.img && m.img.src ? m.img.src : null }));
-  downloadJSON(data, `素材库_${Date.now()}.json`);
+  const data = materials.map(m => ({ id:m.id,name:m.name,color:m.color,size:m.size,price:m.price,wuxing:m.wuxing, series: m.series || '', remark: m.remark || '', stock: m.stock || 0, img: m.img && m.img.src ? m.img.src : null, customAttrs: m.customAttrs || [] }));
+  downloadJSON({ materials: data, allAttrKeys: allAttrKeys }, `素材库_${Date.now()}.json`);
   showToast('素材已导出');
 }
 
@@ -3274,11 +3419,23 @@ function importMaterials(e) {
   const r = new FileReader();
   r.onload = ev => {
     try {
-      const arr = JSON.parse(ev.target.result);
+      const parsed = JSON.parse(ev.target.result);
+      // 兼容旧格式（直接是数组）和新格式（包含 materials 和 allAttrKeys）
+      let arr, importedAttrKeys;
+      if (Array.isArray(parsed)) {
+        arr = parsed;
+      } else {
+        arr = parsed.materials || [];
+        importedAttrKeys = parsed.allAttrKeys || [];
+      }
       if (!Array.isArray(arr)) throw new Error('格式错误');
+      // 合并全局属性名
+      importedAttrKeys.forEach(key => {
+        if (key && !allAttrKeys.includes(key)) allAttrKeys.push(key);
+      });
       arr.forEach(m => {
         const img = new Image(); if (m.img) img.src = m.img;
-        materials.push({ id: m.id || newId(), name: m.name||'未命名', color: m.color||'#a0d2eb', size: m.size||20, price: m.price||0, wuxing: m.wuxing||'土', series: m.series || '', remark: m.remark || '', img, stock: m.stock || 99 });
+        materials.push({ id: m.id || newId(), name: m.name||'未命名', color: m.color||'#a0d2eb', size: m.size||20, price: m.price||0, wuxing: m.wuxing||'土', series: m.series || '', remark: m.remark || '', img, stock: m.stock || 99, customAttrs: m.customAttrs || [] });
       });
       renderTags(); renderMaterials(); scheduleRender(); hitCanvasCache.clear(); showToast(`导入 ${arr.length} 个素材`);
     } catch (err) { showToast('导入失败'); }
