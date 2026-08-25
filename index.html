@@ -138,9 +138,9 @@
   /* Canvas Top-Right Buttons */
   .canvas-top-buttons {
     position: absolute;
-    top: 10px;
-    right: 10px;
     top: 12px;
+    right: 10px;
+    display: flex;
     gap: 14px;
     z-index: 5;
   }
@@ -166,6 +166,78 @@
   }
   .canvas-icon-btn:active {
     transform: scale(0.95);
+  }
+   /* Color picker panel styles */
+  .color-picker-panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    padding: 12px;
+    width: 200px;
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    transition: all 0.2s ease;
+    pointer-events: none;
+  }
+  .color-picker-panel.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+  .color-picker-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .color-picker-label {
+    font-size: 11px;
+    color: #889;
+    font-weight: 600;
+  }
+  .color-picker-input {
+    width: 40px;
+    height: 30px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    background: none;
+    padding: 0;
+  }
+  .color-picker-input::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+  .color-picker-input::-webkit-color-swatch {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+  }
+  .color-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+  .color-swatch {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .color-swatch:hover {
+    transform: scale(1.15);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  }
+  .color-swatch.active {
+    border-color: #2c5f7c;
+    box-shadow: 0 0 0 2px rgba(44,95,124,0.2);
   }
 
   /* Floating Controls */
@@ -500,6 +572,7 @@
     position: absolute;
     top: 10px; left: 10px;
     top: 12px; left: 10px;
+    background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(4px);
     padding: 8px 12px;
     border-radius: 8px;
@@ -639,6 +712,32 @@
         <div class="canvas-top-buttons">
       <button class="canvas-icon-btn" onclick="resetView()" title="重置视图">⟲</button>
       <button class="canvas-icon-btn" onclick="exportImage()" title="导出图片">📷</button>
+      <button class="canvas-icon-btn" id="canvasColorBtn" title="画布颜色">
+        <span id="canvasColorSwatch" style="width:18px;height:18px;border-radius:50%;background:#ffffff;border:1px solid #ddd;display:inline-block;"></span>
+      </button>
+      <div class="color-picker-panel" id="colorPickerPanel">
+        <div class="color-picker-row">
+          <span class="color-picker-label">Preset Colors</span>
+        </div>
+        <div class="color-picker-grid" id="presetColors">
+          <div class="color-swatch" data-color="#ffffff" style="background:#ffffff;border-color:#ddd;"></div>
+          <div class="color-swatch" data-color="#000000" style="background:#000000;"></div>
+          <div class="color-swatch" data-color="#f44336" style="background:#f44336;"></div>
+          <div class="color-swatch" data-color="#e91e63" style="background:#e91e63;"></div>
+          <div class="color-swatch" data-color="#9c27b0" style="background:#9c27b0;"></div>
+          <div class="color-swatch" data-color="#2196f3" style="background:#2196f3;"></div>
+          <div class="color-swatch" data-color="#4caf50" style="background:#4caf50;"></div>
+          <div class="color-swatch" data-color="#ff9800" style="background:#ff9800;"></div>
+          <div class="color-swatch" data-color="#795548" style="background:#795548;"></div>
+          <div class="color-swatch" data-color="#607d8b" style="background:#607d8b;"></div>
+          <div class="color-swatch" data-color="#2c5f7c" style="background:#2c5f7c;"></div>
+          <div class="color-swatch" data-color="#a0d2eb" style="background:#a0d2eb;"></div>
+        </div>
+        <div class="color-picker-row" style="margin-top:8px;">
+          <span class="color-picker-label">Custom Color</span>
+          <input type="color" id="canvasColorPicker" value="#ffffff" class="color-picker-input">
+        </div>
+      </div>
     </div>
     <div class="floating-controls">
       <button class="fab fab-text" id="undoBtn" onclick="doUndo()" title="撤销">撤销</button>
@@ -3204,7 +3303,54 @@ function resetView() {
   scheduleRender();
 }
 
+// === Canvas color picker (custom panel + click outside to close) ===
+function initCanvasColorPicker() {
+  const btn = document.getElementById('canvasColorBtn');
+  const panel = document.getElementById('colorPickerPanel');
+  const picker = document.getElementById('canvasColorPicker');
+  const swatch = document.getElementById('canvasColorSwatch');
+  const presetGrid = document.getElementById('presetColors');
 
+  // Init swatch color
+  swatch.style.background = canvasBgColor;
+  picker.value = canvasBgColor;
+
+  // Toggle panel on button click
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    panel.classList.toggle('show');
+  });
+
+  // Click preset color swatch
+  presetGrid.addEventListener('click', (e) => {
+    const swatchEl = e.target.closest('.color-swatch');
+    if (!swatchEl) return;
+    const color = swatchEl.dataset.color;
+    canvasBgColor = color;
+    swatch.style.background = color;
+    picker.value = color;
+    // Update active state
+    presetGrid.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+    swatchEl.classList.add('active');
+    scheduleRender();
+  });
+
+  // Custom color input
+  picker.addEventListener('input', (e) => {
+    const color = e.target.value;
+    canvasBgColor = color;
+    swatch.style.background = color;
+    presetGrid.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+    scheduleRender();
+  });
+
+  // Click outside panel to close
+  document.addEventListener('click', (e) => {
+    if (!panel.contains(e.target) && e.target !== btn) {
+      panel.classList.remove('show');
+    }
+  });
+}
 
 // === Undo/Redo 历史管理 ===
 let history = [];
@@ -3293,6 +3439,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 (function init() {
+  initCanvasColorPicker();
   const samples = [
     { name:'粉晶',   color:'#f2b5c3', size:20, price:25, wuxing:'火', series:'粉色系', stock:99, remark:'招桃花' },
     { name:'绿幽灵', color:'#7cc48a', size:24, price:55, wuxing:'木', series:'绿色系', stock:99, remark:'聚财' },
